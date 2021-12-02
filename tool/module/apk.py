@@ -129,9 +129,6 @@ class Apk(object):
                         k = 2
 
                     # 每个方法设置两个整型值m,n，用来计算当前方法参数与返回值特征组合在布隆过滤器中的下标
-                    java_basic_type_dict2 = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11, "V": 12}
-                    java_basic_type_arr_dict2 = {"[B": 14, "[S": 15, "[I": 16, "[J": 17, "[F": 18, "[D": 19, "[Z": 20,
-                                                 "[C": 21}
                     method_info = method.get_descriptor()
                     # 记录方法返回值类型
                     method_return_value = method_info[method_info.rfind(")") + 1:]
@@ -142,13 +139,13 @@ class Apk(object):
                         m = 2
                     elif method_return_value.startswith(Constant.JAVA):
                         m = 3
-                    elif method_return_value in java_basic_type_dict2:
-                        m = java_basic_type_dict2[method_return_value]
+                    elif method_return_value in Constant.RETURN_JAVA_BASIC_TYPR_DICT:
+                        m = Constant.RETURN_JAVA_BASIC_TYPR_DICT[method_return_value]
                     # 返回值为数组类型
                     elif method_return_value.startswith(Constant.JAVA_ARR):
                         m = 13
-                    elif method_return_value in java_basic_type_arr_dict2:
-                        m = java_basic_type_arr_dict2[method_return_value]
+                    elif method_return_value in Constant.JAVA_BASIC_TYPR_ARR_DICT:
+                        m = Constant.JAVA_BASIC_TYPR_ARR_DICT[method_return_value] + 1
                     elif method_return_value.startswith(Constant.ARR):
                         m = 22
                     else:
@@ -161,7 +158,6 @@ class Apk(object):
                     if method_param_info == "":  # 方法无参数
                         n = 1
                     else:
-                        method_param_des = []
                         for parm in method_param_info.split(" "):
                             if parm.startswith(Constant.JAVA_TYPE):
                                 parm_info[1] = 1

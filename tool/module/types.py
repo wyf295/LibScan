@@ -39,6 +39,4 @@ class Constant(Enum):
     YES = 1
     NO = 0
 
-    #
-
 

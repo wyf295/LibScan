@@ -1,9 +1,33 @@
 
+import os
+import zipfile
+
+from shutil import move
 
 # 统一方法名表示形式
 def valid_method_name(method_full_name):
     method_full_name = method_full_name.replace(" ", "")
-    class_name = method_full_name[1:method_full_name.find(";")].replace("/",
-                                                                        ".")  # com.google.android.gms.internal.bn.onPause()V
+    class_name = method_full_name[1:method_full_name.find(";")].replace("/", ".")  # com.google.android.gms.internal.bn.onPause()V
     other = method_full_name[method_full_name.find(";") + 1:]  #
     return class_name + "." + other
+
+def read_file_to_list(path, mode = 'r', encoding = 'utf-8'):
+    lines_list=[]
+    with open(path, mode, encoding=encoding) as file:
+        for line in file.readlines():
+            lines_list.append(line.strip("\n"))
+    return lines_list
+
+# 将一个列表均分为n个
+def split_list_n_list(origin_list, n):
+    if len(origin_list) % n == 0:
+        cnt = len(origin_list) // n
+    else:
+        cnt = len(origin_list) // n + 1
+
+    for i in range(0, n):
+        yield origin_list[i * cnt:(i + 1) * cnt]
+
+
+
+
