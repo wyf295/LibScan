@@ -3,7 +3,7 @@ import multiprocessing
 
 # Operating parameters related config
 # 定义运行的线程数
-run_thread_num = multiprocessing.cpu_count() - 4
+thread_num = multiprocessing.cpu_count() - 4
 
 # 影响较大的参数：
 # 当方法内opcode数量或者方法执行路径opcode数量大于该值时，不考虑（关键）
@@ -48,6 +48,6 @@ lib_opcode_rate = 0.3 # 目前没用到
 # Log related config
 logging.basicConfig(level=logging.ERROR,
                     format='%(asctime)s - %(name)s - [%(lineno)d] - %(message)s',
-                    filename="抽样log/log_opcode_error_10.txt",
+                    filename="log.txt",
                     filemode="a+")
 LOGGER = logging.getLogger("console")

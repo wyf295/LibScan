@@ -9,12 +9,16 @@ import hashlib
 
 from config import LOGGER
 from util import valid_method_name
-from types import Constant
+from constant import Constant
 
 from androguard.core.bytecodes.apk import APK
 from androguard.core.bytecodes.dvm import DalvikVMFormat
 from androguard.core.analysis.analysis import Analysis
 from androguard.core.bytecodes import dvm
+
+JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11}
+JAVA_BASIC_TYPR_ARR_DICT = {"[B": 13, "[S": 14, "[I": 15, "[J": 16, "[F": 17, "[D": 18, "[Z": 19, "[C": 20}
+RETURN_JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11, "V": 12}
 
 class Apk(object):
 
@@ -23,8 +27,8 @@ class Apk(object):
         self.apk_name = None # 库文件名
 
         # 后续用于匹配的库信息
-        self._classes_dict = dict() # 记录apk中的所有类信息
-        self._nodes_dict = dict()  # 记录方法内的每一个节点信息
+        self.classes_dict = dict() # 记录apk中的所有类信息
+        self.nodes_dict = dict()  # 记录方法内的每一个节点信息
 
         # 初始化ThirdLib对象时，解析lib对应的dex1文件
         LOGGER.info("开始解析 %s ...", os.path.basename(apk_path))
@@ -53,7 +57,7 @@ class Apk(object):
             for cls in dex_obj.get_classes():
                 class_name = cls.get_name().replace("/", ".")[1:-1]
                 class_name_short = class_name[class_name.rfind(".") + 1:]
-                if class_name_short.startswith(Constant.RESOURCE):  # 不考虑资源类
+                if class_name_short.startswith("R$"):  # 不考虑资源类
                     continue
 
                 class_info_list = []
@@ -70,13 +74,13 @@ class Apk(object):
                 # print(class_access_flags)
                 if class_access_flags == Constant.ZERO or class_access_flags == Constant.PUBLIC:
                     class_bloom_filter[1] = Constant.YES
-                elif class_access_flags.find(Constant.INTERFACE) != -1:
+                elif class_access_flags.find("interface") != -1:
                     class_bloom_filter[2] = Constant.YES
-                elif class_access_flags.find(Constant.INTERFACE) == -1 and class_access_flags.find(Constant.ABSTRACT) != -1:
+                elif class_access_flags.find("interface") == -1 and class_access_flags.find("abstract" != -1):
                     class_bloom_filter[3] = Constant.YES
-                elif class_access_flags.find(Constant.ENUM) != -1:
+                elif class_access_flags.find("enum") != -1:
                     class_bloom_filter[4] = Constant.YES
-                elif class_access_flags.find(Constant.STATIC) != -1:
+                elif class_access_flags.find("static") != -1:
                     class_bloom_filter[5] = Constant.YES
                 if super_class_name != Constant.OBJECT:
                     class_bloom_filter[6] = Constant.YES
@@ -92,23 +96,23 @@ class Apk(object):
                         field_access_flag = EncodedField_obj.get_access_flags_string()
                         field_des = EncodedField_obj.get_descriptor()
 
-                        if field_access_flag.find(Constant.STATIC) == -1:
+                        if field_access_flag.find("static") == -1:
                             a = 2
 
-                        if field_des.startswith(Constant.OBJECT):
+                        if field_des.startswith("Ljava/lang/Object;"):
                             b = 1
-                        elif field_des.startswith(Constant.STRING):
+                        elif field_des.startswith("Ljava/lang/String"):
                             b = 2
-                        elif field_des.startswith(Constant.JAVA_TYPE):
+                        elif field_des.startswith("Ljava/"):
                             b = 3
-                        elif field_des in Constant.JAVA_BASIC_TYPR_DICT:
-                            b = Constant.JAVA_BASIC_TYPR_DICT[field_des]
+                        elif field_des in JAVA_BASIC_TYPR_DICT:
+                            b = JAVA_BASIC_TYPR_DICT[field_des]
                         # 字段属于数组类型
-                        elif field_des.startswith(Constant.JAVA_ARR):
+                        elif field_des.startswith("[Ljava/"):
                             b = 12
-                        elif field_des in Constant.JAVA_BASIC_TYPR_ARR_DICT:
-                            b = Constant.JAVA_BASIC_TYPR_ARR_DICT[field_des]
-                        elif field_des.startswith(Constant.ARR):
+                        elif field_des in JAVA_BASIC_TYPR_ARR_DICT:
+                            b = JAVA_BASIC_TYPR_ARR_DICT[field_des]
+                        elif field_des.startswith("["):
                             b = 21
                         else:
                             b = 22
@@ -118,14 +122,14 @@ class Apk(object):
 
                 for method in cls.get_methods():
 
-                    if method.full_name.find(Constant.INIT) != -1 or method.full_name.find(Constant.CINIT) != -1:
+                    if method.full_name.find("<init>") != -1 or method.full_name.find("<clinit>") != -1:
                         continue
 
                     method_descriptor = ""
 
                     k = 1
                     method_access_flags = method.get_access_flags_string()
-                    if method_access_flags.find(Constant.STATIC) == -1:
+                    if method_access_flags.find("static") == -1:
                         k = 2
 
                     # 每个方法设置两个整型值m,n，用来计算当前方法参数与返回值特征组合在布隆过滤器中的下标
@@ -133,20 +137,20 @@ class Apk(object):
                     # 记录方法返回值类型
                     method_return_value = method_info[method_info.rfind(")") + 1:]
 
-                    if method_return_value.startswith(Constant.OBJECT):
+                    if method_return_value.startswith("Ljava/lang/Object;"):
                         m = 1
-                    elif method_return_value.startswith(Constant.STRING):
+                    elif method_return_value.startswith("Ljava/lang/String"):
                         m = 2
-                    elif method_return_value.startswith(Constant.JAVA):
+                    elif method_return_value.startswith("Ljava"):
                         m = 3
-                    elif method_return_value in Constant.RETURN_JAVA_BASIC_TYPR_DICT:
-                        m = Constant.RETURN_JAVA_BASIC_TYPR_DICT[method_return_value]
+                    elif method_return_value in RETURN_JAVA_BASIC_TYPR_DICT:
+                        m = RETURN_JAVA_BASIC_TYPR_DICT[method_return_value]
                     # 返回值为数组类型
-                    elif method_return_value.startswith(Constant.JAVA_ARR):
+                    elif method_return_value.startswith("[Ljava/"):
                         m = 13
-                    elif method_return_value in Constant.JAVA_BASIC_TYPR_ARR_DICT:
-                        m = Constant.JAVA_BASIC_TYPR_ARR_DICT[method_return_value] + 1
-                    elif method_return_value.startswith(Constant.ARR):
+                    elif method_return_value in JAVA_BASIC_TYPR_ARR_DICT:
+                        m = JAVA_BASIC_TYPR_ARR_DICT[method_return_value] + 1
+                    elif method_return_value.startswith("["):
                         m = 22
                     else:
                         m = 23
@@ -159,11 +163,11 @@ class Apk(object):
                         n = 1
                     else:
                         for parm in method_param_info.split(" "):
-                            if parm.startswith(Constant.JAVA_TYPE):
+                            if parm.startswith("Ljava/"):
                                 parm_info[1] = 1
                             elif parm in Constant.JAVA_BASIC_TYPE:
                                 parm_info[2] = 1
-                            elif parm.startswith(Constant.ARR):
+                            elif parm.startswith("["):
                                 parm_info[3] = 1
                             else:
                                 parm_info[4] = 1
@@ -209,7 +213,7 @@ class Apk(object):
 
                     method_info_list = []
 
-                    if method.full_name.startswith(Constant.JAVA):
+                    if method.full_name.startswith("Ljava"):
                         continue
 
                     bytecode_buff = dvm.get_bytecodes_method(dex, analysis_obj, method)
@@ -248,7 +252,7 @@ class Apk(object):
                         continue
                     # 添加apk接口或抽象类中的方法数量，注意此时类值列表长度为1，而不是5
                     class_info_list = [len(cls.get_methods()), class_bloom_filter]
-                    self._classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
+                    self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
                     continue
 
                 # 说明类中只有init构造方法，不考虑
@@ -274,7 +278,7 @@ class Apk(object):
                 class_info_list.append(class_bloom_filter)
                 class_info_list.append(class_method_info_dict)
 
-                self._classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
+                self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
 
         time_end = datetime.datetime.now()
         extract_info_time = time_end - time_start
@@ -317,13 +321,13 @@ class Apk(object):
                     node_info = [node_opcode_seq[:-1]]
                     invoke_method_valid_name = valid_method_name(method_info)
                     node_info.append(invoke_method_valid_name)
-                    self._nodes_dict[inter_method_name + "_" + str(num)] = node_info
+                    self.nodes_dict[inter_method_name + "_" + str(num)] = node_info
                     num += 1
                     node_opcode_seq = ""
 
         # if node_opcode_seq != "": 可能存在一些opcode为空的方法，也要记录
         node_info = [node_opcode_seq[:-1], ""]
-        self._nodes_dict[inter_method_name + "_" + str(num)] = node_info
+        self.nodes_dict[inter_method_name + "_" + str(num)] = node_info
 
         return method_opcode_seq[:-1]
 
