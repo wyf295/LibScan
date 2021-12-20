@@ -10,8 +10,6 @@ from shutil import move
 from module.config import LOGGER
 from module.analyzer import search_lib_in_app
 
-
-
 # 用户命令行输入参数解析
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Process some integers')
@@ -126,12 +124,12 @@ def main(lib_folder = None,
          lib_dex_folder = None,
          apk_folder = None,
          output_folder = 'outputs',
-         processes = None,):
+         processes = None):
     # 目前假设一定传入检测的库目录
 
     # 将库目录下所有的arr、jar文件转化为dex文件，并放入libs_dex目录下
-    arr_to_jar(lib_folder)
-    jar_to_dex(lib_folder, lib_dex_folder)
+    # arr_to_jar(lib_folder)
+    # jar_to_dex(lib_folder, lib_dex_folder)
 
     search_lib_in_app(os.path.abspath(lib_dex_folder),
                       os.path.abspath(apk_folder),
@@ -140,6 +138,7 @@ def main(lib_folder = None,
 
 
 if __name__ == '__main__':
+    print(sys.maxsize)
     sys.path.append('module/config')
 
     args = parse_arguments()
@@ -152,7 +151,7 @@ if __name__ == '__main__':
     if args.subparser_name == 'detect_all':
         main(apk_folder = args.af, output_folder = args.o, processes = args.p, lib_dex_folder = args.ld)
     elif args.subparser_name == 'detect_specific':
-        main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder=args.o, processes=args.p)
+        main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p)
     else:
         LOGGER.error("检测模式输入错误!")
 

@@ -5,16 +5,18 @@ import multiprocessing
 import datetime
 import time
 
-from config import (LOGGER, apk_lib_method_opcode_rate, method_mutiple, opcode_error, opcode_mutiple, class_similar,
-                    min_match, max_opcode_len, abstract_method_weight,thread_num)
+from config import (LOGGER, apk_lib_method_opcode_rate, opcode_error, class_similar,
+                    min_match, max_opcode_len, thread_num)
 from lib import ThirdLib
 from apk import Apk
 from util import split_list_n_list
 
+# 为接口或抽象类中没有方法体的方法赋予权重值参与得分计算
+abstract_method_weight = 3 # 一般不调
 
 def get_methods_jar_map():
     methodes_jar = {}
-    with open("module/conf/methodes_jar.txt", "r", encoding="utf-8") as file:
+    with open("conf/methodes_jar.txt", "r", encoding="utf-8") as file:
         for line in file.readlines():
             line = line.strip("\n")
             methodes_jar[line[:line.find(":")]] = line[line.find(":") + 1:]
@@ -35,7 +37,8 @@ def get_lib_name(lib):
         lib_name_dict[line[0]] = line[1]
 
     if lib_name_version not in lib_name_dict:
-        LOGGER.error("没有库名信息：%s", lib_name_version)
+        LOGGER.error("没有在obf_tpl_pkg.csv文件中找到库对应的真实名称信息：%s", lib_name_version)
+        return ""
 
     return lib_name_dict[lib_name_version].replace("/",".")
 
@@ -195,8 +198,9 @@ def match(opcodes1, opcodes2, opcode_dict):
     lib_method_len = len(lib_method_opcode)
 
     # apk方法中opcode数量不一定大于对应的库方法中的opcode数量了，手动分析发现的
-    if apk_method_len < lib_method_len * apk_lib_method_opcode_rate or apk_method_len > method_mutiple * lib_method_len:
-        return False
+    # 在进行具体的过滤比较之前，要求apk方法opcode数量必须>=库方法，但必须小于库方法的method_mutiple = 3倍
+    # if apk_method_len < lib_method_len * apk_lib_method_opcode_rate or apk_method_len > 3 * lib_method_len:
+    #     return False
 
     # 通过过滤器的方式检测apk方法与lib方法是否匹配(库中方法的opcode必须存在于apk方法中）
     # 先使用apk方法设置过滤器的每一位
@@ -260,10 +264,10 @@ def pre_match(apk_classes_dict, lib_classes_dict, filter_result, opcode_dict):
                 continue
 
             # 如果大的类opcode数是小的opcode_mutiple = 5倍以上，则不匹配
-            max_opcodes_num = max(apk_classes_dict[apk_class][2], lib_classes_dict[lib_class][2])
-            min_opcodes_num = min(apk_classes_dict[apk_class][2], lib_classes_dict[lib_class][2])
-            if max_opcodes_num / min_opcodes_num > opcode_mutiple:
-                continue
+            # max_opcodes_num = max(apk_classes_dict[apk_class][2], lib_classes_dict[lib_class][2])
+            # min_opcodes_num = min(apk_classes_dict[apk_class][2], lib_classes_dict[lib_class][2])
+            # if max_opcodes_num / min_opcodes_num > 2:
+            #     continue
 
             # 进行类中方法的一对一匹配，目的是得到apk类中所有完成一对一匹配的方法（可以考虑使用按类中方法先后顺序完成一对一匹配，也可以每次寻找最大相似度匹配）
             methods_match_dict = {}  # 用于记录apk中类方法与对应的lib类方法匹配关系
@@ -384,7 +388,7 @@ def detect_lib(libs_name,
                global_dependence_bool,
                global_lib_info_dict):
     # 读取opcode及编号，用于后面进行方法匹配
-    opcode_dict = get_opcode_coding("module/conf/opcodes_encoding.txt")
+    opcode_dict = get_opcode_coding("conf/opcodes_encoding.txt")
 
     result = {}  # 记录当前库所有版本检测结果
     flag = True  # 记录当前库是成功检测完成，还是存在尚未检测的依赖库，目前无法检测
@@ -648,7 +652,7 @@ def search_lib_in_app(lib_dex_folder = None,
     global_interface_libs_list = multiprocessing.Manager().list()
     # 定义多进程将所有待检测的库全部反编译，并将node_dict保存到全局内存
     processes_list_decompile = []
-    for sub_libs in split_list_n_list(libs, processes):
+    for sub_libs in split_list_n_list(libs, run_thread_num):
         thread = multiprocessing.Process(target=sub_decompile_lib,
                                          args=(lib_dex_folder, sub_libs, global_lib_info_dict, shared_lock_lib_info))
         processes_list_decompile.append(thread)
@@ -662,6 +666,7 @@ def search_lib_in_app(lib_dex_folder = None,
     LOGGER.info("所有库信息提取完成, 用时：%d", (time_end - time_start).seconds)
 
     for apk in os.listdir(apk_folder):
+        print("开始分析：", apk)
         LOGGER.info("开始分析：%s", apk)
         apk_time_start = datetime.datetime.now()
 
@@ -684,15 +689,16 @@ def search_lib_in_app(lib_dex_folder = None,
         global_jar_dict = multiprocessing.Manager().dict()
         for jar in os.listdir(lib_dex_folder):
             lib_name = get_lib_name(jar)
-            libs_list = global_jar_dict.get(lib_name, [])
-            libs_list.append(jar)
-            global_jar_dict[lib_name] = libs_list
+            if lib_name != "":
+                libs_list = global_jar_dict.get(lib_name, [])
+                libs_list.append(jar)
+                global_jar_dict[lib_name] = libs_list
         LOGGER.info("检测的库个数为：%d", len(global_jar_dict))
 
         # processes = 1
         # 定义多进程检测
         processes_list_detect = []
-        for i in range(1, processes + 1):
+        for i in range(1, run_thread_num + 1):
             process_name = "子进程 " + str(i)
             thread = multiprocessing.Process(target=sub_detect, args=(process_name,
                                                                       global_jar_dict,
@@ -730,7 +736,6 @@ def search_lib_in_app(lib_dex_folder = None,
             if time_sec % 10 == 0 and len(global_dependence_bool) == 0:  # 每10秒检测一次
                 not_finish_num = len(global_jar_dict.keys()) + len(global_running_jar_list)
                 if (last_finish_rate == finish_rate and dependence == 3) or (not_finish_num <= 41):
-
                     LOGGER.debug("出现循环依赖，当前分析完成率为：%s, 剩余库个数为：%d", str(finish_rate) + "%", not_finish_num)
                     global_dependence_bool.append(True)
                 elif last_finish_rate == finish_rate:

@@ -1,9 +1,4 @@
 
-import os
-import zipfile
-
-from shutil import move
-
 # 统一方法名表示形式
 def valid_method_name(method_full_name):
     method_full_name = method_full_name.replace(" ", "")

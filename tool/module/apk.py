@@ -9,16 +9,14 @@ import hashlib
 
 from config import LOGGER
 from util import valid_method_name
-from constant import Constant
 
 from androguard.core.bytecodes.apk import APK
 from androguard.core.bytecodes.dvm import DalvikVMFormat
 from androguard.core.analysis.analysis import Analysis
 from androguard.core.bytecodes import dvm
 
-JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11}
-JAVA_BASIC_TYPR_ARR_DICT = {"[B": 13, "[S": 14, "[I": 15, "[J": 16, "[F": 17, "[D": 18, "[Z": 19, "[C": 20}
-RETURN_JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11, "V": 12}
+# 设置一个类在过滤器中相同特征信息的记录次数上限
+filter_record_limit = 10
 
 class Apk(object):
 
@@ -72,23 +70,26 @@ class Apk(object):
                 class_access_flags = cls.get_access_flags_string()
 
                 # print(class_access_flags)
-                if class_access_flags == Constant.ZERO or class_access_flags == Constant.PUBLIC:
-                    class_bloom_filter[1] = Constant.YES
+                if class_access_flags == "0x0" or class_access_flags == "public":
+                    class_bloom_filter[1] = 1
                 elif class_access_flags.find("interface") != -1:
-                    class_bloom_filter[2] = Constant.YES
-                elif class_access_flags.find("interface") == -1 and class_access_flags.find("abstract" != -1):
-                    class_bloom_filter[3] = Constant.YES
+                    class_bloom_filter[2] = 1
+                elif class_access_flags.find("interface") == -1 and class_access_flags.find("abstract") != -1:
+                    class_bloom_filter[3] = 1
                 elif class_access_flags.find("enum") != -1:
-                    class_bloom_filter[4] = Constant.YES
+                    class_bloom_filter[4] = 1
                 elif class_access_flags.find("static") != -1:
-                    class_bloom_filter[5] = Constant.YES
-                if super_class_name != Constant.OBJECT:
-                    class_bloom_filter[6] = Constant.YES
+                    class_bloom_filter[5] = 1
+                if super_class_name != "Ljava/lang/Object;":
+                    class_bloom_filter[6] = 1
 
                 # 获取并记录字段在布隆过滤器中的如下信息：有final、无final、有static、无static、java引用类型字段、Android引用类型字段、java基本类型字段（8种）、其他引用类型字段
-                # if len(cls.get_fields()) == 0: print("类无字段！")
+                # 定义类型字典
+                JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11}
+                JAVA_BASIC_TYPR_ARR_DICT = {"[B": 13, "[S": 14, "[I": 15, "[J": 16, "[F": 17, "[D": 18, "[Z": 19, "[C": 20}
+                RETURN_JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11, "V": 12}
                 if len(cls.get_fields()) == 0:  # 无字段
-                    class_bloom_filter[7] = Constant.YES
+                    class_bloom_filter[7] = 1
                 else:
                     for EncodedField_obj in cls.get_fields():
                         a = 1
@@ -131,6 +132,8 @@ class Apk(object):
                     method_access_flags = method.get_access_flags_string()
                     if method_access_flags.find("static") == -1:
                         k = 2
+                    else:
+                        method_descriptor += "static "
 
                     # 每个方法设置两个整型值m,n，用来计算当前方法参数与返回值特征组合在布隆过滤器中的下标
                     method_info = method.get_descriptor()
@@ -139,22 +142,29 @@ class Apk(object):
 
                     if method_return_value.startswith("Ljava/lang/Object;"):
                         m = 1
+                        method_descriptor += "Ljava/lang/Object/ "
                     elif method_return_value.startswith("Ljava/lang/String"):
                         m = 2
+                        method_descriptor += "Ljava/lang/String/ "
                     elif method_return_value.startswith("Ljava"):
                         m = 3
+                        method_descriptor += "Ljava/ "
                     elif method_return_value in RETURN_JAVA_BASIC_TYPR_DICT:
                         m = RETURN_JAVA_BASIC_TYPR_DICT[method_return_value]
+                        method_descriptor = method_descriptor + method_return_value + " "
                     # 返回值为数组类型
                     elif method_return_value.startswith("[Ljava/"):
                         m = 13
+                        method_descriptor += "[Ljava/ "
                     elif method_return_value in JAVA_BASIC_TYPR_ARR_DICT:
                         m = JAVA_BASIC_TYPR_ARR_DICT[method_return_value] + 1
+                        method_descriptor = method_descriptor + method_return_value + " "
                     elif method_return_value.startswith("["):
                         m = 22
+                        method_descriptor += "Array "
                     else:
                         m = 23
-
+                        method_descriptor += "Other "
                     # 记录方法参数类型
                     method_param_info = method_info[method_info.find("(") + 1:method_info.find(")")]
                     parm_info = {}
@@ -162,16 +172,24 @@ class Apk(object):
                     if method_param_info == "":  # 方法无参数
                         n = 1
                     else:
+                        method_param_des = []
                         for parm in method_param_info.split(" "):
                             if parm.startswith("Ljava/"):
                                 parm_info[1] = 1
-                            elif parm in Constant.JAVA_BASIC_TYPE:
+                                method_param_des.append("Ljava/")
+                            elif parm in ["B", "S", "I", "J", "F", "D", "Z", "C"]:
                                 parm_info[2] = 1
+                                method_param_des.append(parm)
                             elif parm.startswith("["):
                                 parm_info[3] = 1
+                                method_param_des.append("Array")
                             else:
                                 parm_info[4] = 1
-
+                                method_param_des.append("Other")
+                        # 将方法参数信息按字典排序后写入方法的descriptor
+                        method_param_des.sort()
+                        for parm in method_param_des:
+                            method_descriptor = method_descriptor + parm + " "
                         if len(parm_info) == 1:
                             if 1 in parm_info:
                                 n = 2
@@ -222,8 +240,7 @@ class Apk(object):
                     method_opcodes = self._get_method_info(bytecode_buff, method_name)
                     # method_nodes_count[valid_method_name(method.full_name)]=node_count
 
-                    if method_opcodes == "" or len(method_opcodes.split(" ")) < config.min_method_opcode_num \
-                            or len(method_opcodes.split(" ")) > config.max_opcode_len:
+                    if method_opcodes == "" or len(method_opcodes.split(" ")) > config.max_opcode_len:
                         continue
 
                     method_num += 1
@@ -245,8 +262,8 @@ class Apk(object):
                     class_method_info_dict[method_name] = method_info_list
 
                 # 在分析完类中所有方法后，考虑当前类是接口或者抽象类的情况（关键：抽象类或者接口中也可以有非抽象方法）
-                if len(class_method_md5_list) == 0 and (class_access_flags.find(Constant.INTERFACE) != -1 or
-                                                        class_access_flags.find(Constant.ABSTRACT) != -1):
+                if len(class_method_md5_list) == 0 and (class_access_flags.find("interface") != -1 or
+                                                        class_access_flags.find("abstract") != -1):
                     # 只考虑有抽象方法的接口或抽象类
                     if len(cls.get_methods()) == 0:
                         continue
@@ -334,9 +351,9 @@ class Apk(object):
     # 将指定元素加入类过滤器中
     def _add_class_filter(self, class_filter, index):
         index_num = class_filter.get(index, 0)
-        count = index_num + 1
-        if count > count.filter_record_limit:
-            count = count.filter_record_limit
+        count = int(index_num) + 1
+        if count > filter_record_limit:
+            count = filter_record_limit
         class_filter[index] = count
 
 

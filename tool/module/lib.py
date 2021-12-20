@@ -7,18 +7,17 @@ import datetime
 import hashlib
 
 from util import valid_method_name
-from constant import Constant
 
 from androguard.core.bytecodes.dvm import DalvikVMFormat
 from androguard.core.analysis.analysis import Analysis
 from androguard.core.bytecodes import dvm
 from androguard.util import read
-from config import LOGGER, min_method_opcode_num, max_opcode_len, abstract_method_weight, filter_record_limit
+from config import LOGGER, max_opcode_len
 
-
-JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11}
-JAVA_BASIC_TYPR_ARR_DICT = {"[B": 13, "[S": 14, "[I": 15, "[J": 16, "[F": 17, "[D": 18, "[Z": 19, "[C": 20}
-RETURN_JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11, "V": 12}
+# 设置一个类在过滤器中相同特征信息的记录次数上限
+filter_record_limit = 10
+# 为接口或抽象类中没有方法体的方法赋予权重值参与得分计算
+abstract_method_weight = 3 # 一般不调
 
 class ThirdLib(object):
 
@@ -28,11 +27,11 @@ class ThirdLib(object):
         self.lib_package_name = None # 库对应的唯一包名
 
         # 后续用于匹配的库信息
-        self.lib_opcode_num = None  # 库中的opcode数量之和
+        self.lib_opcode_num = int()  # 库中的opcode数量之和
         self.classes_dict = dict() # 记录库中的所有类信息
         self.lib_filter = dict() # 库过滤器，记录库类中包含的一些特征信息
         self.nodes_dict = dict()  # 记录方法内的每一个节点信息
-        self.lib_method_num = None # 记录库中所有方法数量
+        self.lib_method_num = int() # 记录库中所有方法数量
         self.ground_class_flag = False  # 记录库中是否有非抽象类或接口的类，默认无
         self.invoke_methodes = set() # 记录库中调用的所有方法
 
@@ -74,23 +73,28 @@ class ThirdLib(object):
             super_class_name = cls.get_superclassname()
             class_access_flags = cls.get_access_flags_string()
 
-            if class_access_flags == Constant.ZERO or class_access_flags == Constant.PUBLIC:
-                class_filter[1] = Constant.YES
+            if class_access_flags == "0x0" or class_access_flags == "public":
+                class_filter[1] = 1
             elif class_access_flags.find("interface") != -1:
-                class_filter[2] = Constant.YES
+                class_filter[2] = 1
             elif class_access_flags.find("interface") == -1 and class_access_flags.find("abstract") != -1:
-                class_filter[3] = Constant.YES
+                class_filter[3] = 1
             elif class_access_flags.find("enum") != -1:
-                class_filter[4] = Constant.YES
+                class_filter[4] = 1
             elif class_access_flags.find("static") != -1:
-                class_filter[5] = Constant.YES
+                class_filter[5] = 1
 
-            if super_class_name != Constant.OBJECT:
-                class_filter[6] = Constant.YES
+            if super_class_name != "Ljava/lang/Object;":
+                class_filter[6] = 1
 
             # 获取并记录字段在过滤器中的位置信息
+            # 定义类型字典
+            JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11}
+            JAVA_BASIC_TYPR_ARR_DICT = {"[B": 13, "[S": 14, "[I": 15, "[J": 16, "[F": 17, "[D": 18, "[Z": 19, "[C": 20}
+            RETURN_JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11, "V": 12}
+
             if len(cls.get_fields()) == 0:  # 无字段
-                class_filter[7] = Constant.YES
+                class_filter[7] = 1
             else:
                 for EncodedField_obj in cls.get_fields():
                     a = 1
@@ -129,12 +133,16 @@ class ThirdLib(object):
                 # 定义方法的唯一标识名，需要避免方法重载的影响（重载的方法就是方法参数信息不同，其他都相同）
                 method_name = valid_method_name(method.full_name)
 
+                method_descriptor = ""
+
                 # 在每个方法中获取并记录类在布隆过滤器中的如下信息：是否有方法final、是否有方法static、方法返回存在信息、方法参数存在信息
                 k = 1
                 # 在每个方法中获取并记录类在布隆过滤器中的如下信息：是否有方法final、是否有方法static、方法返回存在信息、方法参数存在信息
                 method_access_flags = method.get_access_flags_string()
                 if method_access_flags.find("static") == -1:
                     k = 2
+                else:
+                    method_descriptor += "static "
 
                 # 每个方法设置两个整型值m,n，用来计算当前方法参数与返回值特征组合在布隆过滤器中的下标
                 method_info = method.get_descriptor()
@@ -143,21 +151,29 @@ class ThirdLib(object):
 
                 if method_return_value.startswith("Ljava/lang/Object;"):
                     m = 1
+                    method_descriptor += "Ljava/lang/Object/ "
                 elif method_return_value.startswith("Ljava/lang/String"):
                     m = 2
+                    method_descriptor += "Ljava/lang/String/ "
                 elif method_return_value.startswith("Ljava/"):
                     m = 3
+                    method_descriptor += "Ljava/ "
                 elif method_return_value in RETURN_JAVA_BASIC_TYPR_DICT:
                     m = RETURN_JAVA_BASIC_TYPR_DICT[method_return_value]
+                    method_descriptor = method_descriptor + method_return_value + " "
                 # 返回值为数组类型
                 elif method_return_value.startswith("[Ljava/"):
                     m = 13
+                    method_descriptor += "[Ljava/ "
                 elif method_return_value in JAVA_BASIC_TYPR_ARR_DICT:
                     m = JAVA_BASIC_TYPR_ARR_DICT[method_return_value] + 1
+                    method_descriptor = method_descriptor + method_return_value + " "
                 elif method_return_value.startswith("["):
                     m = 22
+                    method_descriptor += "Array "
                 else:
                     m = 23
+                    method_descriptor += "Other "
 
                 # 记录方法参数类型
                 method_param_info = method_info[method_info.find("(") + 1:method_info.find(")")]
@@ -166,15 +182,25 @@ class ThirdLib(object):
                 if method_param_info == "":  # 方法无参数
                     n = 1
                 else:
+                    method_param_des = []
                     for parm in method_param_info.split(" "):
                         if parm.startswith("Ljava/"):
                             parm_info[1] = 1
-                        elif parm in Constant.JAVA_BASIC_TYPE:
+                            method_param_des.append("Ljava/")
+                        elif parm in ["B", "S", "I", "J", "F", "D", "Z", "C"]:
                             parm_info[2] = 1
+                            method_param_des.append(parm)
                         elif parm.startswith("["):
                             parm_info[3] = 1
+                            method_param_des.append("Array")
                         else:
                             parm_info[4] = 1
+                            method_param_des.append("Other")
+                    # 将方法参数信息按字典排序后写入方法的descriptor
+                    method_param_des.sort()
+                    for parm in method_param_des:
+                        method_descriptor = method_descriptor + parm + " "
+
                     if len(parm_info) == 1:
                         if 1 in parm_info:
                             n = 2
@@ -219,8 +245,7 @@ class ThirdLib(object):
 
                 method_opcodes = self._get_method_info(bytecode_buff, method_name)
 
-                if method_opcodes == "" or len(method_opcodes.split(" ")) < min_method_opcode_num \
-                        or len(method_opcodes.split(" ")) > max_opcode_len:
+                if method_opcodes == "" or len(method_opcodes.split(" ")) > max_opcode_len:
                     continue
 
                 method_num += 1
@@ -236,6 +261,7 @@ class ThirdLib(object):
                 method_info_list.append(method_md5_value)
                 method_info_list.append(method_opcodes)
                 method_info_list.append(method_opcode_num)
+                method_info_list.append(method_descriptor[:-1])
 
                 class_method_info_dict[method_name] = method_info_list
 
@@ -291,9 +317,9 @@ class ThirdLib(object):
 
     def _get_lib_name(self):
         lib = self.lib_file_name
-        lib_name_version = lib[:lib.rfind(".")]
+        lib_name_version = lib[:lib.rfind("-")]
 
-        csv_reader = csv.reader(open("module/conf/obf_tpl_pkg.csv", encoding="utf-8"))
+        csv_reader = csv.reader(open("conf/obf_tpl_pkg.csv", encoding="utf-8"))
         csv_reader = list(csv_reader)
 
         lib_name_dict = {}
@@ -364,7 +390,7 @@ class ThirdLib(object):
     # 将lib中的类名添加到布隆过滤器中合适位置里的集合中
     def _add_filter(self, class_name, index, num):
         contain_list = self.lib_filter.get(index, [set() for i in range(filter_record_limit)])
-        set_index = num - 1
+        set_index = int(num) - 1
         if set_index > filter_record_limit:
             set_index = filter_record_limit
         class_set = contain_list.pop(set_index)
