@@ -136,9 +136,8 @@ def main(lib_folder = None,
                       os.path.abspath(output_folder),
                       processes)
 
-
 if __name__ == '__main__':
-    print(sys.maxsize)
+    # print(sys.maxsize)
     sys.path.append('module/config')
 
     args = parse_arguments()

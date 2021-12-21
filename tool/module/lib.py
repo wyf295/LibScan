@@ -33,7 +33,7 @@ class ThirdLib(object):
         self.nodes_dict = dict()  # 记录方法内的每一个节点信息
         self.lib_method_num = int() # 记录库中所有方法数量
         self.ground_class_flag = False  # 记录库中是否有非抽象类或接口的类，默认无
-        self.invoke_methodes = set() # 记录库中调用的所有方法
+        self.invoke_other_methodes = set() # 记录库中调用的所有方法
 
         # 初始化ThirdLib对象时，解析lib对应的dex1文件
         LOGGER.info("开始解析 %s ...", os.path.basename(lib_path))
@@ -52,6 +52,9 @@ class ThirdLib(object):
         # 处理库名信息
         self.lib_file_name = lib_path[lib_path.rfind("/") + 1:]
         self.lib_package_name = self._get_lib_name()
+
+        # 记录库中所有的被调用方法名称
+        invoke_methodes = set()
 
         time_start = datetime.datetime.now()
         for cls in dex_obj.get_classes():
@@ -243,7 +246,7 @@ class ThirdLib(object):
 
                 bytecode_buff = dvm.get_bytecodes_method(dex_obj, analysis_obj, method)
 
-                method_opcodes = self._get_method_info(bytecode_buff, method_name)
+                method_opcodes = self._get_method_info(bytecode_buff, method_name, invoke_methodes)
 
                 if method_opcodes == "" or len(method_opcodes.split(" ")) > max_opcode_len:
                     continue
@@ -311,6 +314,14 @@ class ThirdLib(object):
 
             self.lib_method_num += method_num
 
+        # 找出库中调用的所有非库中的方法名称
+        invoke_other_methodes = set()
+        for invoke_method in invoke_methodes:
+            invoke_class = invoke_method[:invoke_method.rfind(".")]
+            if invoke_method + "_1" not in self.nodes_dict and invoke_class not in self.classes_dict:
+                invoke_other_methodes.add(invoke_method)
+        self.invoke_other_methodes = invoke_other_methodes
+
         time_end = datetime.datetime.now()
         extract_info_time = time_end - time_start
         LOGGER.info("解析库完成，用时：%d", extract_info_time.seconds)
@@ -332,7 +343,7 @@ class ThirdLib(object):
         return lib_name_dict[lib_name_version].replace("/", ".")
 
     # 获取每个方法的opcode序列字符串
-    def _get_method_info(self, bytecode_buff, inter_method_name):
+    def _get_method_info(self, bytecode_buff, inter_method_name, invoke_methodes):
         method_opcode_seq = ""  # 记录当前方法的opcode序列
         num = 1  # 标记方法的第几个节点
         node_opcode_seq = ""  # 记录当前节点的opcode序列
@@ -367,7 +378,7 @@ class ThirdLib(object):
 
                     node_info = [node_opcode_seq[:-1]]
                     invoke_method_valid_name = valid_method_name(method_info)
-                    self.invoke_methodes.add(invoke_method_valid_name)
+                    invoke_methodes.add(invoke_method_valid_name)
                     node_info.append(invoke_method_valid_name)
                     self.nodes_dict[inter_method_name + "_" + str(num)] = node_info
                     num += 1

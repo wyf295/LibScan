@@ -4,6 +4,8 @@ import random
 import multiprocessing
 import datetime
 import time
+import sys
+import networkx as nx
 
 from config import (LOGGER, apk_lib_method_opcode_rate, opcode_error, class_similar,
                     min_match, max_opcode_len, thread_num)
@@ -13,6 +15,8 @@ from util import split_list_n_list
 
 # 为接口或抽象类中没有方法体的方法赋予权重值参与得分计算
 abstract_method_weight = 3 # 一般不调
+# 定义允许的最大递归深度
+sys.setrecursionlimit(1000000)
 
 def get_methods_jar_map():
     methodes_jar = {}
@@ -30,7 +34,6 @@ def get_lib_name(lib):
     import csv
     csv_reader = csv.reader(open("conf/obf_tpl_pkg.csv",encoding="utf-8"))
     csv_reader = list(csv_reader)
-
 
     lib_name_dict = {}
     for line in csv_reader:
@@ -56,14 +59,50 @@ def get_opcode_coding(path):
     return opcode_dict
 
 # 实现子进程提前反编译所有单个库
-def sub_decompile_lib(lib_folder, libs, global_lib_info_dict, shared_lock_lib_info):
+def sub_decompile_lib(lib_folder,
+                      libs,
+                      global_lib_info_dict,
+                      shared_lock_lib_info,
+                      methodes_jar,
+                      global_dependence_relation,
+                      global_dependence_libs,
+                      shared_lock_dependence_info,
+                      loop_dependence_libs):
     # Logger.error("%s 开始运行...", process_name)
 
     for lib in libs:
+        lib_name = get_lib_name(lib)
         lib_obj = ThirdLib(lib_folder + "/" + lib)
+
+        # 记录库反编译信息
         shared_lock_lib_info.acquire()
         global_lib_info_dict[lib] = lib_obj
         shared_lock_lib_info.release()
+
+        if len(loop_dependence_libs) > 0:
+            continue
+
+        # 记录库依赖信息
+        invoke_other_methodes = lib_obj.invoke_other_methodes
+        for invoke_method in invoke_other_methodes:
+            if invoke_method not in methodes_jar:
+                continue
+
+            invoke_lib_name = get_lib_name(methodes_jar[invoke_method])
+
+            if invoke_lib_name == lib_name:
+                continue
+
+            dependence_relation = (lib_name, invoke_lib_name)
+
+            shared_lock_dependence_info.acquire()
+            if lib_name not in global_dependence_libs:
+                global_dependence_libs.append(lib_name)
+            if invoke_lib_name not in global_dependence_libs:
+                global_dependence_libs.append(invoke_lib_name)
+            if dependence_relation not in global_dependence_relation:
+                global_dependence_relation.append(dependence_relation)
+            shared_lock_dependence_info.release()
 
 # 反编译lib，得到粗粒度的类信息字典，键为类名，值为类中所有方法opcode序列的hash值排序组合字符串
 # 注：将库的方法中opcode个数小于3的方法排除
@@ -74,66 +113,69 @@ def decompile_lib(lib,
                   global_finished_jar_dict,
                   global_running_jar_list,
                   shared_lock_libs,
-                  global_dependence_bool,
-                  global_lib_info_dict):
-
+                  global_lib_info_dict,
+                  loop_dependence_libs):
     if lib in cur_libs:
-        return None
-    cur_libs.add(get_lib_name(lib))
+        return []
+    lib_name = get_lib_name(lib)
+    # 记录当前已经加入内容的依赖库
+    cur_libs.add(lib_name)
 
     lib_obj = global_lib_info_dict[lib]
     nodes_dict = lib_obj.nodes_dict
-    invoke_methodes = lib_obj.invoke_methodes
-    classes_dict = lib_obj.classes_dict
+    invoke_other_methodes = lib_obj.invoke_other_methodes
 
-    # 如果剩余待检测库存在循环依赖，则后续都不考虑库依赖关系了
-    if len(global_dependence_bool) == 0:
-        # 先检查当前库所依赖的其他所有库是否都检测完成了，如果中间有一个依赖库尚未完成，则直接返回，避免某些依赖库不必要的反编译
-        dependence_libs = set()
-        for invoke_method in invoke_methodes:
-            invoke_class = invoke_method[:invoke_method.rfind(".")]
-            if invoke_method not in methodes_jar:
-                continue
-            invoke_lib_jar = methodes_jar[invoke_method]
-            # 特殊处理：对于当前的日志库，一定会存在slfj与logback的循环依赖，所以为了加快速度，直接忽略对日志库的依赖引入（可改进！）
-            if invoke_lib_jar.startswith("slf4j") or invoke_lib_jar.startswith("logback"):
-                continue
+    # 只有当当前库依赖的库属于循环依赖库，才不考虑该依赖库，即使当前库属于循环依赖库，也继续判断，因为可能存在其依赖的部分库不存在循环依赖，这部分库的内容应该加入进来
+    dependence_libs = set()
+    for invoke_method in invoke_other_methodes:
+        if invoke_method not in methodes_jar:
+            continue
 
-            lib_name_key = get_lib_name(invoke_lib_jar)
-            if (invoke_method + "_1" not in nodes_dict) and (invoke_class not in classes_dict) \
-                    and (invoke_method in methodes_jar) and (lib_name_key not in cur_libs) \
-                    and (lib_name_key not in dependence_libs):
-                # 得到调用库的唯一标识名
-                shared_lock_libs.acquire()
-                if lib_name_key in global_jar_dict or lib_name_key in global_running_jar_list:  # 说明依赖库尚未分析或者正在分析中
-                    # print("存在未完成的依赖：", lib_name_key)
-                    shared_lock_libs.release()
-                    return None
-                elif lib_name_key in global_finished_jar_dict and lib_name_key not in cur_libs:  # 说明依赖库已经分析了，同时有检测结果，则需加入结果
-                    shared_lock_libs.release()
-                    dependence_libs.add(lib_name_key)
-                else:  # 说明依赖库已经分析了，但是不存在于当前apk中，所以无需引入该依赖库
-                    shared_lock_libs.release()
-                    cur_libs.add(lib_name_key)
+        invoke_lib_jar = methodes_jar[invoke_method]
+        # 特殊处理：对于当前的日志库，一定会存在slfj与logback的循环依赖，所以为了加快速度，直接忽略对日志库的依赖引入（可改进！）
+        # if invoke_lib_jar.startswith("slf4j") or invoke_lib_jar.startswith("logback"):
+        #     continue
 
-        # 到此说明当前库依赖的库都已经分析完成了，需要引入的依赖库存在于dependence_libs集合中，依次加入所有依赖库即可即可
-        for lib_name_key in dependence_libs:
-            result = []
-            invoke_lib = global_finished_jar_dict[lib_name_key].split(" and ")[0]
+        lib_name_key = get_lib_name(invoke_lib_jar)
+        # 如果调用库属于循环依赖库，则不考虑
+        if lib_name_key in loop_dependence_libs or lib_name_key == lib_name:
+            continue
 
-            invoke_lib_obj = None
-            if os.path.exists("../libs_dex/" + invoke_lib):
-                invoke_lib_obj = decompile_lib(invoke_lib, methodes_jar, cur_libs, global_jar_dict,
-                                       global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
-                                       global_dependence_bool, global_lib_info_dict)
-                if len(result) != 0:
-                    LOGGER.warning("加入其他库内容：%s", invoke_lib)
+        if lib_name_key not in cur_libs and lib_name_key not in dependence_libs:
+            # 得到调用库的唯一标识名
+            shared_lock_libs.acquire()
+            if lib_name_key in global_jar_dict or lib_name_key in global_running_jar_list:  # 说明依赖库尚未分析或者正在分析中
+                # print("存在未完成的依赖：", lib_name_key)
+                # 记录下库依赖关系
+                shared_lock_libs.release()
+                return None
+            elif lib_name_key in global_finished_jar_dict and lib_name_key not in cur_libs:  # 说明依赖库已经分析了，同时有检测结果，则需加入结果
+                shared_lock_libs.release()
+                dependence_libs.add(lib_name_key)
+            else:  # 说明依赖库已经分析了，但是不存在于当前apk中，所以无需引入该依赖库
+                shared_lock_libs.release()
+                cur_libs.add(lib_name_key)
 
-            if invoke_lib_obj == None:
-                continue
+    # 到此说明当前库依赖的库都已经分析完成了，需要引入的依赖库存在于dependence_libs集合中，依次加入所有依赖库即可即可
+    for lib_name_key in dependence_libs:
+        result = []
+        invoke_lib = global_finished_jar_dict[lib_name_key].split(" and ")[0]
 
-            # 将调用库的node_dict合并到当前库的node_dict中
-            nodes_dict.update(invoke_lib_obj.nodes_dict)
+        invoke_lib_obj = None
+        if os.path.exists("../libs_dex/" + invoke_lib):
+            invoke_lib_obj = decompile_lib(invoke_lib, methodes_jar, cur_libs, global_jar_dict,
+                                   global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
+                                   global_lib_info_dict, loop_dependence_libs)
+            if len(result) != 0:
+                LOGGER.warning("加入其他库内容：%s", invoke_lib)
+        else:
+            LOGGER.info("当前检测库中缺少依赖库：%s", invoke_lib)
+
+        if invoke_lib_obj == None:
+            continue
+
+        # 将调用库的node_dict合并到当前库的node_dict中
+        nodes_dict.update(invoke_lib_obj.nodes_dict)
 
     lib_obj.nodes_dict = nodes_dict
 
@@ -385,8 +427,8 @@ def detect_lib(libs_name,
                global_finished_jar_dict,
                global_running_jar_list,
                shared_lock_libs,
-               global_dependence_bool,
-               global_lib_info_dict):
+               global_lib_info_dict,
+               loop_dependence_libs):
     # 读取opcode及编号，用于后面进行方法匹配
     opcode_dict = get_opcode_coding("conf/opcodes_encoding.txt")
 
@@ -400,7 +442,7 @@ def detect_lib(libs_name,
         cur_libs = set()
         lib_obj = decompile_lib(lib, methodes_jar, cur_libs, global_jar_dict,
                                     global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
-                                    global_dependence_bool, global_lib_info_dict)
+                                    global_lib_info_dict, loop_dependence_libs)
         # 不检测纯接口类
         # if len(result_list) >= 7 and not result_list[6]:
         #     # Logger.error("不检测纯接口库：%s", lib)
@@ -582,11 +624,11 @@ def sub_detect(process_name,
                shared_lock_libs,
                global_libs_info_dict,
                shared_lock_libs_info,
-               global_dependence_bool,
                apk_classes_dict,
                apk_nodes_dict,
                methodes_jar,
-               global_lib_info_dict):
+               global_lib_info_dict,
+               loop_dependence_libs):
     # Logger.error("%s 开始运行...", process_name)
 
     while len(global_jar_dict) > 0:
@@ -603,7 +645,7 @@ def sub_detect(process_name,
         # 对同一个库的所有版本进行检测,并返回检测结果字典（键为jar名，值为四个值）
         result, flag = detect_lib(libs, apk_classes_dict, apk_nodes_dict, methodes_jar, global_jar_dict,
                                   global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
-                                  global_dependence_bool, global_lib_info_dict)
+                                  global_lib_info_dict, loop_dependence_libs)
 
         if not flag:  # 说明当前库由于存在尚未完成的依赖库，未执行检测
             shared_lock_libs.acquire()
@@ -630,6 +672,19 @@ def sub_detect(process_name,
             global_running_jar_list.remove(first_key)
             shared_lock_libs.release()
 
+# 实现子线程根据依赖关系确定循环依赖库
+def sub_find_loop_dependence_libs(libs, dependence_relation, loop_dependence_libs, shared_lock_loop_libs):
+    DG = nx.DiGraph(list(dependence_relation))
+    for lib_name in libs:
+        try:
+            nx.find_cycle(DG, source = lib_name)
+            shared_lock_loop_libs.acquire()
+            if lib_name not in loop_dependence_libs:
+                loop_dependence_libs.append(lib_name)
+            shared_lock_loop_libs.release()
+        except Exception:
+            pass
+
 def search_lib_in_app(lib_dex_folder = None,
                       apk_folder = None,
                       output_folder = 'outputs',
@@ -646,22 +701,58 @@ def search_lib_in_app(lib_dex_folder = None,
     random.shuffle(libs)
     # 定义全局库反编译结果，提前将单个库反编译并保存信息，需要时直接取，避免单个库被重复多次反编译
     global_lib_info_dict = multiprocessing.Manager().dict()
-    # 定义对应共享锁
+    # 定义记录库反编译信息共享锁
     shared_lock_lib_info = multiprocessing.Manager().Lock()
-    # 记录在反编译提取信息过程中发现的所有纯接口的库
-    global_interface_libs_list = multiprocessing.Manager().list()
+    # 记录所有分析库中的依赖关系
+    global_dependence_relation = multiprocessing.Manager().list()
+    # 记录所有分析库中存在依赖关系的库列表
+    global_dependence_libs = multiprocessing.Manager().list()
+    # 定义记录依赖信息共享锁
+    shared_lock_dependence_info = multiprocessing.Manager().Lock()
+    # 根据库依赖关系得到所有存在循环依赖的库列表
+    loop_dependence_libs = multiprocessing.Manager().list()
+    loop_dependence_libs = ['ezvcard', 'freemarker', 'org.osmdroid', 'org.slf4j','ch.qos.logback.classic','org.slf4j.impl', 'nl.siegmann.epublib']
+    # 定义循环依赖库列表共享锁
+    shared_lock_loop_libs = multiprocessing.Manager().Lock()
+
     # 定义多进程将所有待检测的库全部反编译，并将node_dict保存到全局内存
     processes_list_decompile = []
     for sub_libs in split_list_n_list(libs, run_thread_num):
         thread = multiprocessing.Process(target=sub_decompile_lib,
-                                         args=(lib_dex_folder, sub_libs, global_lib_info_dict, shared_lock_lib_info))
+                                         args=(lib_dex_folder, sub_libs, global_lib_info_dict,
+                                               shared_lock_lib_info, methodes_jar,
+                                               global_dependence_relation, global_dependence_libs,
+                                               shared_lock_dependence_info, loop_dependence_libs))
         processes_list_decompile.append(thread)
+
     # 开启所有反编译子进程
     for thread in processes_list_decompile:
         thread.start()
+
     # 等待所有反编译子进程运行结束
     for thread in processes_list_decompile:
         thread.join()
+
+    # 定义多线程根据库依赖关系找出所有存在循环依赖的库，后续对于这些库的检测不考虑依赖库
+    if len(loop_dependence_libs) == 0:
+        # print("处理依赖库")
+        processes_list_libs_dependence = []
+        for sub_libs in split_list_n_list(global_dependence_libs, run_thread_num):
+            thread = multiprocessing.Process(target=sub_find_loop_dependence_libs,
+                                             args=(sub_libs, global_dependence_relation, loop_dependence_libs,
+                                                   shared_lock_loop_libs))
+            processes_list_libs_dependence.append(thread)
+
+        # 开启所有反编译子进程
+        for thread in processes_list_libs_dependence:
+            thread.start()
+
+        # 等待所有反编译子进程运行结束
+        for thread in processes_list_libs_dependence:
+            thread.join()
+
+    print("所有循环依赖库如下：", loop_dependence_libs)
+
     time_end = datetime.datetime.now()
     LOGGER.info("所有库信息提取完成, 用时：%d", (time_end - time_start).seconds)
 
@@ -678,8 +769,6 @@ def search_lib_in_app(lib_dex_folder = None,
         global_running_jar_list = multiprocessing.Manager().list()
         # 定义全局检测结果详细信息列表（记录每个被检测为包含的库版本详细信息，用于最后输出）
         global_libs_info_dict = multiprocessing.Manager().dict()
-        # 定义全局变量，表明当前是否检测为循环依赖
-        global_dependence_bool = multiprocessing.Manager().list()
 
         # 为三个全局的数据结构定义一把锁
         shared_lock_libs = multiprocessing.Manager().Lock()
@@ -707,11 +796,11 @@ def search_lib_in_app(lib_dex_folder = None,
                                                                       shared_lock_libs,
                                                                       global_libs_info_dict,
                                                                       shared_lock_libs_info,
-                                                                      global_dependence_bool,
                                                                       apk_obj.classes_dict,
                                                                       apk_obj.nodes_dict,
                                                                       methodes_jar,
-                                                                      global_lib_info_dict))
+                                                                      global_lib_info_dict,
+                                                                      loop_dependence_libs))
             processes_list_detect.append(thread)
 
         # 开启所有子进程
@@ -719,10 +808,7 @@ def search_lib_in_app(lib_dex_folder = None,
             thread.start()
 
         # 主进程定期检测当前分析完成的库数量，并按百分制进度条显示
-        dependence = 0  # 用于依赖记录的升级
-        last_finish_rate = 0  # 用于记录上一次检测时，检测的完成率
         time_sec = 0
-
         all_libs_num = len(os.listdir(lib_dex_folder))
         LOGGER.info("本次分析的库数量为：%d", all_libs_num)
         time.sleep(1)
@@ -732,18 +818,6 @@ def search_lib_in_app(lib_dex_folder = None,
             print('\r' + "正在分析：" + '▇' * (int(finish_rate / 2)) + str(finish_rate) + '%', end='')
             time.sleep(1)
             time_sec += 1
-
-            if time_sec % 10 == 0 and len(global_dependence_bool) == 0:  # 每10秒检测一次
-                not_finish_num = len(global_jar_dict.keys()) + len(global_running_jar_list)
-                if (last_finish_rate == finish_rate and dependence == 3) or (not_finish_num <= 41):
-                    LOGGER.debug("出现循环依赖，当前分析完成率为：%s, 剩余库个数为：%d", str(finish_rate) + "%", not_finish_num)
-                    global_dependence_bool.append(True)
-                elif last_finish_rate == finish_rate:
-                    dependence += 1
-                else:
-                    dependence = 0
-                    last_finish_rate = finish_rate
-
             finish_num = all_libs_num - len(global_jar_dict) - len(global_running_jar_list)
         print('\r' + "正在分析：" + '▇' * (int(finish_num / all_libs_num * 100 / 2)) + str(
             int(finish_num / all_libs_num * 100)) + '%', end='')
