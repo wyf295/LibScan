@@ -12,7 +12,7 @@ from androguard.core.bytecodes.dvm import DalvikVMFormat
 from androguard.core.analysis.analysis import Analysis
 from androguard.core.bytecodes import dvm
 from androguard.util import read
-from config import LOGGER, max_opcode_len
+from config import LOGGER
 
 # 设置一个类在过滤器中相同特征信息的记录次数上限
 filter_record_limit = 10
@@ -248,7 +248,10 @@ class ThirdLib(object):
 
                 method_opcodes = self._get_method_info(bytecode_buff, method_name, invoke_methodes)
 
-                if method_opcodes == "" or len(method_opcodes.split(" ")) > max_opcode_len:
+                # if method_opcodes == "" or len(method_opcodes.split(" ")) > max_opcode_len:
+                #     continue
+
+                if method_opcodes == "":
                     continue
 
                 method_num += 1

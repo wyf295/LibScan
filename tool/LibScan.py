@@ -8,7 +8,7 @@ import sys
 
 from shutil import move
 from module.config import LOGGER
-from module.analyzer import search_lib_in_app
+from module.analyzer import search_lib_in_app,search_libs_in_app
 
 # 用户命令行输入参数解析
 def parse_arguments():
@@ -16,35 +16,41 @@ def parse_arguments():
     subparsers = parser.add_subparsers(
         help='sub-command help', dest='subparser_name')
 
-    parser_all = subparsers.add_parser(
-        'detect_all', help='指定模式：检测apk中所有第三方库及版本号')
-    parser_all.add_argument(
+    parser_one = subparsers.add_parser(
+        'detect_one', help='指定模式：检测多个apk中是否存在某一个第三方库具体版本（apk检测级并行）')
+    parser_one.add_argument(
         '-o',
         metavar='FOLDER',
         type=str,
         default='outputs',
         help='指定结果输出目录')
-    parser_all.add_argument(
+    parser_one.add_argument(
         '-p',
         metavar='processes',
         type=int,
         default=None,
         help='设置所有并行工作阶段的最大线程数（默认为当前工作机器的CPU核心数）'
     )
-    parser_all.add_argument(
+    parser_one.add_argument(
         '-v',
         metavar='VERSION',
         type=str,
         default="INFO",
         help='设置日志输出级别，可选INFO/DEBUG'
     )
-    parser_all.add_argument(
+    parser_one.add_argument(
         '-af',
         metavar='FOLDER',
         type=str,
         help='指定一个apk目录'
     )
-    parser_all.add_argument(
+    parser_one.add_argument(
+        '-lf',
+        metavar='FOLDER',
+        type=str,
+        help='指定一个lib目录'
+    )
+    parser_one.add_argument(
         '-ld',
         metavar='FOLDER',
         type=str,
@@ -52,7 +58,7 @@ def parse_arguments():
     )
 
     parser_specific = subparsers.add_parser(
-        'detect_specific', help='指定模式：检测apk中是否存在具体的第三方库版本')
+        'detect_all', help='指定模式：检测多个apk中是否存在多个第三方库具体版本（库检测级并行）')
     parser_specific.add_argument(
         '-o',
         metavar='FOLDER',
@@ -97,12 +103,8 @@ def parse_arguments():
 def jar_to_dex(libs_folder, lib_dex_folder):
     for file in os.listdir(libs_folder):
         file_name = file[:file.rfind(".")]
-        cmd = "d2j-jar2dex.bat " + libs_folder + "/" + file + " -o " + libs_folder + "/" + file_name + ".dex"
-        print("cmd: ", cmd)
+        cmd = "d2j-jar2dex.bat " + libs_folder + "/" + file + " -o " + lib_dex_folder + "/" + file_name + ".dex"
         os.system(cmd)
-    for file in os.listdir(libs_folder):
-        if file.endswith(".dex"):
-            move(libs_folder + "/" + file, lib_dex_folder + "/" + file)
 
 # 将aar文件转换为jar文件
 def arr_to_jar(libs_folder):
@@ -124,20 +126,34 @@ def main(lib_folder = None,
          lib_dex_folder = None,
          apk_folder = None,
          output_folder = 'outputs',
-         processes = None):
+         processes = None,
+         model = None):
     # 目前假设一定传入检测的库目录
 
     # 将库目录下所有的arr、jar文件转化为dex文件，并放入libs_dex目录下
     # arr_to_jar(lib_folder)
     # jar_to_dex(lib_folder, lib_dex_folder)
 
-    search_lib_in_app(os.path.abspath(lib_dex_folder),
-                      os.path.abspath(apk_folder),
-                      os.path.abspath(output_folder),
-                      processes)
+    if model == "multiple":
+        search_libs_in_app(os.path.abspath(lib_dex_folder),
+                          os.path.abspath(apk_folder),
+                          os.path.abspath(output_folder),
+                          processes)
+    elif model == "one":
+        search_lib_in_app(os.path.abspath(lib_dex_folder),
+                           os.path.abspath(apk_folder),
+                           os.path.abspath(output_folder),
+                           processes)
 
 if __name__ == '__main__':
     # print(sys.maxsize)
+
+    # 移除已经分析完成的apk
+    for file in os.listdir("outputs"):
+        apk = file[:file.rfind(".")]
+        if os.path.exists("apks/" + apk):
+            os.remove("apks/" + apk)
+
     sys.path.append('module/config')
 
     args = parse_arguments()
@@ -147,10 +163,10 @@ if __name__ == '__main__':
 
     start_time = datetime.datetime.now()
 
-    if args.subparser_name == 'detect_all':
-        main(apk_folder = args.af, output_folder = args.o, processes = args.p, lib_dex_folder = args.ld)
-    elif args.subparser_name == 'detect_specific':
-        main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p)
+    if args.subparser_name == 'detect_one':
+        main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p, model="one")
+    elif args.subparser_name == 'detect_all':
+        main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p, model="multiple")
     else:
         LOGGER.error("检测模式输入错误!")
 

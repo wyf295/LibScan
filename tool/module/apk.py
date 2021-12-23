@@ -240,7 +240,10 @@ class Apk(object):
                     method_opcodes = self._get_method_info(bytecode_buff, method_name)
                     # method_nodes_count[valid_method_name(method.full_name)]=node_count
 
-                    if method_opcodes == "" or len(method_opcodes.split(" ")) > config.max_opcode_len:
+                    # if method_opcodes == "" or len(method_opcodes.split(" ")) > config.max_opcode_len:
+                    #     continue
+
+                    if method_opcodes == "":
                         continue
 
                     method_num += 1

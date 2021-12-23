@@ -5,17 +5,17 @@ import multiprocessing
 # 定义运行的线程数
 import sys
 
-thread_num = multiprocessing.cpu_count() - 4
+thread_num = multiprocessing.cpu_count() - 8
 
 # 影响较大的参数：
 # 当方法内opcode数量或者方法执行路径opcode数量大于该值时，不考虑（关键）
-max_opcode_len = sys.maxsize # 可调（基本确定）700
+# max_opcode_len = sys.maxsize # 可调（基本确定）700
 
 # 每opcode_error阈值位，允许有1位误差，低于该值，不允许有误差，该值越大，匹配要求的越严格
-opcode_error = sys.maxsize # 关键 25
+# opcode_error = sys.maxsize # 关键 25
 
 #  apk方法中opcode数量不一定大于对应的库方法中的opcode数量，手动分析发现的
-apk_lib_method_opcode_rate = 0.8 # 未使用
+# apk_lib_method_opcode_rate = 0.8 # 未使用
 
 # 在进行类粗粒度匹配时，app类中匹配方法的权重之和比上该类权重大于阈值class_similar，则视为类匹配
 class_similar = 0.8 # 很关键（基本确定）
