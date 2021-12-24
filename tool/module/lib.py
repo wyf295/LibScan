@@ -23,7 +23,7 @@ class ThirdLib(object):
 
     def __init__(self, lib_path):
         # 库的基本信息
-        self.lib_file_name = None # 库文件名
+        self.lib_name = None # 库文件名
         self.lib_package_name = None # 库对应的唯一包名
 
         # 后续用于匹配的库信息
@@ -50,7 +50,7 @@ class ThirdLib(object):
         LOGGER.info("反编译完成，用时：%d", decompile_time.seconds)
 
         # 处理库名信息
-        self.lib_file_name = lib_path[lib_path.rfind("/") + 1:]
+        self.lib_name = os.path.basename(lib_path)
         self.lib_package_name = self._get_lib_name()
 
         # 记录库中所有的被调用方法名称
@@ -330,7 +330,7 @@ class ThirdLib(object):
         LOGGER.info("解析库完成，用时：%d", extract_info_time.seconds)
 
     def _get_lib_name(self):
-        lib = self.lib_file_name
+        lib = self.lib_name
         lib_name_version = lib[:lib.rfind("-")]
 
         csv_reader = csv.reader(open("conf/obf_tpl_pkg.csv", encoding="utf-8"))

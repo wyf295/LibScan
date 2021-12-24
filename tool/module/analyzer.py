@@ -436,8 +436,10 @@ def fine_match(apk_nodes_dict, lib_classes_dict, lib_nodes_dict, methods_match_d
             apk_pre_methods.extend(list(methods_match_dict[apk_class][lib_class].keys()))
             lib_pre_methods.extend(list(methods_match_dict[apk_class][lib_class].values()))
 
+    LOGGER.warning("获取方法的完整路径...")
     apk_methods_action = get_methods_action(apk_pre_methods, apk_nodes_dict)
     lib_methods_action = get_methods_action(lib_pre_methods, lib_nodes_dict)
+    LOGGER.warning("方法完整路径获取完成...")
 
     lib_class_match_result = {}  # 键为lib类名，值为列表，包含当前细粒度匹配的apk类、类中细粒度匹配的方法数、类中所有方法细粒度匹配得分之和
     finish_lib_classes = []
@@ -480,7 +482,7 @@ def fine_match(apk_nodes_dict, lib_classes_dict, lib_nodes_dict, methods_match_d
 
     return lib_class_match_result
 
-def detect(apk_obj, lib, lib_obj):
+def detect(apk_obj, lib_obj):
     '''
     检测apk中包含的库信息
     :param apk_obj: 构建的apk对象
@@ -534,7 +536,7 @@ def detect(apk_obj, lib, lib_obj):
     LOGGER.debug("库中所有参与匹配的类数：%d", len(lib_classes_dict))
 
     if lib_match_rate < min_match:  # 当粗粒度匹配得分极小时，直接不包含，无需进行细粒度匹配
-        LOGGER.debug("极小匹配库：%s，粗粒度匹配率为：%f", lib, lib_match_rate)
+        LOGGER.debug("极小匹配库：%s，粗粒度匹配率为：%f", lib_obj.lib_name, lib_match_rate)
         return {}
 
     # 进行细粒度匹配
@@ -564,7 +566,7 @@ def detect(apk_obj, lib, lib_obj):
     temp_list = [final_match_method_opcodes, lib_opcode_num, final_match_method_opcodes / lib_opcode_num]
     if final_match_method_opcodes / lib_opcode_num > min_lib_match3:
         LOGGER.debug("包含")
-        result[lib] = temp_list
+        result[lib_obj.lib_name] = temp_list
 
     return result
 
@@ -603,7 +605,7 @@ def detect_lib(libs_name,
         lib_versions_dict[lib] = lib_obj
 
     for lib in lib_versions_dict:
-        result.update(detect(apk_obj, lib, lib_versions_dict[lib]))
+        result.update(detect(apk_obj, lib_versions_dict[lib]))
 
     return result, flag
 
@@ -715,7 +717,7 @@ def search_libs_in_app(lib_dex_folder = None,
     shared_lock_dependence_info = multiprocessing.Manager().Lock()
     # 根据库依赖关系得到所有存在循环依赖的库列表
     loop_dependence_libs = multiprocessing.Manager().list()
-    loop_dependence_libs = ['ezvcard', 'freemarker', 'org.osmdroid', 'org.slf4j','ch.qos.logback.classic','org.slf4j.impl', 'nl.siegmann.epublib']
+    # loop_dependence_libs = ['ezvcard', 'freemarker', 'org.osmdroid', 'org.slf4j','ch.qos.logback.classic','org.slf4j.impl', 'nl.siegmann.epublib']
     # 定义循环依赖库列表共享锁
     shared_lock_loop_libs = multiprocessing.Manager().Lock()
 
@@ -851,7 +853,6 @@ def search_libs_in_app(lib_dex_folder = None,
         LOGGER.info("当前apk分析时长：%d（单位秒）", (apk_time_end - apk_time_start).seconds)
 
 def sub_detect_apk(process_name,
-                   lib_name,
                    lib_obj,
                    apk_folder,
                    global_apk_list,
@@ -868,11 +869,11 @@ def sub_detect_apk(process_name,
             break
 
         apk_obj = Apk(apk_folder + "/" + apk)
-        result = detect(apk_obj, lib_name, lib_obj)
+        result = detect(apk_obj, lib_obj)
 
         if len(result) != 0:
             share_lock_result.acquire()
-            global_result_dict[apk] = str(result[lib_name][2])
+            global_result_dict[apk] = str(result[lib_obj.lib_name][2])
             share_lock_result.release()
 
 def search_lib_in_app(lib_dex_folder = None,
@@ -890,7 +891,6 @@ def search_lib_in_app(lib_dex_folder = None,
     lib_path = ""
     for lib in os.listdir(lib_dex_folder):
         lib_path = lib_dex_folder + "/" + lib
-    lib_name = os.path.basename(lib_path)
     lib_obj = ThirdLib(lib_path)
     time_end = datetime.datetime.now()
     LOGGER.info("库信息提取完成, 用时：%d", (time_end - time_start).seconds)
@@ -912,7 +912,6 @@ def search_lib_in_app(lib_dex_folder = None,
     for i in range(1, run_thread_num + 1):
         process_name = str(i)
         thread = multiprocessing.Process(target=sub_detect_apk, args=(process_name,
-                                                                      lib_name,
                                                                       lib_obj,
                                                                       apk_folder,
                                                                       global_apk_list,
@@ -951,7 +950,7 @@ def search_lib_in_app(lib_dex_folder = None,
     with open(output_folder + "/result.txt", "w", encoding="utf-8") as result:
         result.write("apk名称     库名称     相似度得分\n")
         for k in sorted(global_result_dict.keys()):
-            result.write(k + "   " + lib_name + "   " + global_result_dict[k] + '\n')
+            result.write(k + "   " + lib_obj.lib_name + "   " + global_result_dict[k] + '\n')
 
     # 输出apk分析时长
     time_end = datetime.datetime.now()
