@@ -8,7 +8,7 @@ import config
 import hashlib
 
 from config import LOGGER
-from util import valid_method_name
+from util import valid_method_name,deal_opcode_deq
 
 from androguard.core.bytecodes.apk import APK
 from androguard.core.bytecodes.dvm import DalvikVMFormat
@@ -35,6 +35,7 @@ class Apk(object):
 
     # 读取obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名
     def _parse_apk(self, apk_path):
+        self.apk_name = os.path.basename(apk_path)
         # 使用AndroGuard反编译apk
         time_start = datetime.datetime.now()
         try:
@@ -257,7 +258,7 @@ class Apk(object):
                     class_method_md5_list.append(method_md5_value)
 
                     method_info_list.append(method_md5_value)
-                    method_info_list.append(method_opcodes)
+                    method_info_list.append(deal_opcode_deq(method_opcodes))# 存放的是方法内去重后的opcode序列
                     method_info_list.append(method_opcode_num)
                     method_info_list.append(method_descriptor[:-1])
 

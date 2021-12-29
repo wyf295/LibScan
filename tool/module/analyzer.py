@@ -11,7 +11,7 @@ from config import (LOGGER, class_similar,
                     min_match, thread_num)
 from lib import ThirdLib
 from apk import Apk
-from util import split_list_n_list
+from util import split_list_n_list,deal_opcode_deq
 
 # 为接口或抽象类中没有方法体的方法赋予权重值参与得分计算
 abstract_method_weight = 3 # 一般不调
@@ -345,10 +345,8 @@ def coarse_match(apk_classes_dict, lib_classes_dict, filter_result, opcode_dict)
                         lib_match_methods.append(method2)
                         break
 
-                    apk_method_opcode = apk_class_methods_dict[method1][1]
-                    lib_method_opcode = lib_class_methods_dict[method2][1]
-                    if match(apk_method_opcode, lib_method_opcode, opcode_dict):
-                        lib_method_len = len(lib_method_opcode.split(" "))
+                    if match(apk_class_methods_dict[method1][1], lib_class_methods_dict[method2][1], opcode_dict):
+                        lib_method_len = lib_class_methods_dict[method2][2]
                         # 必须遍历库类中的所有方法，找出最合适的方法完成匹配
                         if lib_method_len > match_lib_method_opcode_num:
                             if method1 in methods_match_dict: # 说明之前有匹配的方法已经存入methods_match_dict与lib_match_methods
@@ -373,10 +371,10 @@ def coarse_match(apk_classes_dict, lib_classes_dict, filter_result, opcode_dict)
 
     return lib_match_classes, abstract_lib_match_classes, apk_class_methods_match_dict
 
+
 # 递归的获取当前方法的完整opcode执行序列，算法：在二叉树上的中、右、左遍历（为了避免循环调用对当前方法的影响，删除会循环调用边）
 # 注意：并不是调用路径中一个方法只能出现一次，只要不会出现循环调用，可以多次调用同一个方法，比如某个tool方法，设置route_node_list来记录。
-def get_method_action(node, node_dict, method_action_dict, route_method_set):
-    # sys.setrecursionlimit(1000000)
+def get_method_action(node, node_dict, method_action_dict, route_method_set, invoke_length): # 某些特殊情况下，会出现无限递归bug
     # 该算法较复杂，需要实际验证是否正确
     method_name = node[:node.rfind("_")]
 
@@ -384,33 +382,33 @@ def get_method_action(node, node_dict, method_action_dict, route_method_set):
 
     if node.endswith("_1"):  # 说明调用进入了一个新的方法
         if method_name in method_action_dict:  # 如果这个新方法之前已经遍历过了，保存其opcode执行序列结果，直接获取返回
-            # print("已经遍历过的方法：", method_name)
             return method_action_dict[method_name]
         route_method_set.add(method_name)
 
     invoke_method_name = node_dict[node][1]
+    cur_invoke_len = invoke_length
 
-    if invoke_method_name != "" and invoke_method_name not in route_method_set and invoke_method_name + "_1" in node_dict:  # 调用的新方法不能是当前正在调用路径上的方法
+    if invoke_method_name != "" and invoke_method_name not in route_method_set and invoke_method_name + "_1" in node_dict\
+            and invoke_length <= 10:  # 调用的新方法不能是当前正在调用路径上的方法
+        invoke_length += 1
+        seq = get_method_action(invoke_method_name + "_1", node_dict, method_action_dict, route_method_set, invoke_length)
         if cur_action_seq.endswith(" "):
-            cur_action_seq = cur_action_seq + get_method_action(invoke_method_name + "_1", node_dict,
-                                                                method_action_dict, route_method_set)
+            cur_action_seq = cur_action_seq + seq
         else:
-            cur_action_seq = cur_action_seq + " " + get_method_action(invoke_method_name + "_1", node_dict,
-                                                                      method_action_dict, route_method_set)
+            cur_action_seq = cur_action_seq + " " + seq
 
     node_num = int(node[node.rfind("_") + 1:])
     next_node = method_name + "_" + str(node_num + 1)
     if next_node in node_dict:
+        seq = get_method_action(next_node, node_dict, method_action_dict, route_method_set, cur_invoke_len)
         if cur_action_seq.endswith(" "):
-            cur_action_seq = cur_action_seq + get_method_action(next_node, node_dict, method_action_dict,
-                                                                route_method_set)
+            cur_action_seq = cur_action_seq + seq
         else:
-            cur_action_seq = cur_action_seq + " " + get_method_action(next_node, node_dict, method_action_dict,
-                                                                      route_method_set)
+            cur_action_seq = cur_action_seq + " " + seq
 
     # 方法起始节点的右子树与左子树都遍历完成了，记录该方法完整遍历结果
     if node.endswith("_1"):
-        method_action_dict[method_name] = cur_action_seq
+        method_action_dict[method_name] = deal_opcode_deq(cur_action_seq)
         route_method_set.remove(method_name)
 
     return cur_action_seq
@@ -421,25 +419,32 @@ def get_methods_action(method_list, node_dict):
 
     for method in method_list:
         # print("分析方法：",method)
-        get_method_action(method + "_1", node_dict, method_action_dict, set())
+        get_method_action(method + "_1", node_dict, method_action_dict, set(), 0)
 
     return method_action_dict
 
+
 # 细粒度匹配
-def fine_match(apk_nodes_dict, lib_classes_dict, lib_nodes_dict, methods_match_dict, opcode_dict):
+def fine_match(apk_obj, lib_classes_dict, lib_nodes_dict, methods_match_dict, opcode_dict):
+    apk_nodes_dict = apk_obj.nodes_dict
     # 根据粗粒度匹配结果进行细粒度匹配
     # 1、获取所有需要比较的方法opcode执行序列，并记录到自定methods_action = {method_name: opcode_seq}（可改进：多线程获取）
-    apk_pre_methods = []
-    lib_pre_methods = []
+    apk_pre_methods = set()
+    lib_pre_methods = set()
     for apk_class in methods_match_dict:
         for lib_class in methods_match_dict[apk_class]:
-            apk_pre_methods.extend(list(methods_match_dict[apk_class][lib_class].keys()))
-            lib_pre_methods.extend(list(methods_match_dict[apk_class][lib_class].values()))
+            apk_pre_methods.update(set(list(methods_match_dict[apk_class][lib_class].keys())))
+            lib_pre_methods.update(set(list(methods_match_dict[apk_class][lib_class].values())))
 
-    LOGGER.warning("获取方法的完整路径...")
+    LOGGER.info("获取方法的完整路径...")
     apk_methods_action = get_methods_action(apk_pre_methods, apk_nodes_dict)
     lib_methods_action = get_methods_action(lib_pre_methods, lib_nodes_dict)
-    LOGGER.warning("方法完整路径获取完成...")
+    LOGGER.info("方法完整路径获取完成...")
+    from fei.fileUtil import write_list_to_file
+    lines = []
+    for method in apk_methods_action:
+        lines.append(method + ":" + apk_methods_action[method])
+    write_list_to_file(lines,str(apk_obj.apk_name) + "_methods_opcode.txt","w")
 
     lib_class_match_result = {}  # 键为lib类名，值为列表，包含当前细粒度匹配的apk类、类中细粒度匹配的方法数、类中所有方法细粒度匹配得分之和
     finish_lib_classes = []
@@ -456,19 +461,16 @@ def fine_match(apk_nodes_dict, lib_classes_dict, lib_nodes_dict, methods_match_d
 
             match_method_num = 0
             methods_opcodes_num = 0  # 记录当前库类中细粒度匹配的所有方法opcode数量之和
-            score = 0  # 记录当前类中所有完成细粒度匹配方法得分之和
             for k, v in methods_match_dict[apk_class][lib_class].items():
-
                 if match(apk_methods_action[k], lib_methods_action[v], opcode_dict):
                     # 将当前完成细粒度匹配的lib方法opcode数量加上
                     methods_opcodes_num += lib_classes_dict[lib_class][3][v][2]
-                    score += len(lib_methods_action[v].split(" "))
                     match_method_num += 1
 
-            if score > class_score:
+            if methods_opcodes_num > class_score:
                 lib_class_match_method_num = match_method_num
                 lib_class_match_method_opcodes = methods_opcodes_num
-                class_score = score
+                class_score = methods_opcodes_num
                 max_lib_class = lib_class
 
         # 从apk类对lib类的多对一匹配，筛选出一对一匹配，最终得分一对一匹配
@@ -540,7 +542,7 @@ def detect(apk_obj, lib_obj):
         return {}
 
     # 进行细粒度匹配
-    lib_class_match_result = fine_match(apk_obj.nodes_dict,
+    lib_class_match_result = fine_match(apk_obj,
                                         lib_classes_dict,
                                         lib_nodes_dict,
                                         methods_match_dict,

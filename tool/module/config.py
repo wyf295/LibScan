@@ -5,7 +5,7 @@ import multiprocessing
 # 定义运行的线程数
 import sys
 
-thread_num = multiprocessing.cpu_count() - 15
+thread_num = multiprocessing.cpu_count() - 8
 
 # 影响较大的参数：
 # 当方法内opcode数量或者方法执行路径opcode数量大于该值时，不考虑（关键）
@@ -33,7 +33,7 @@ min_match = 0.1 # 可调
 
 
 # Log related config
-logging.basicConfig(level=logging.WARNING,
+logging.basicConfig(level=logging.ERROR,
                     format='%(asctime)s - %(name)s - [%(lineno)d] - %(message)s',
                     filename="log.txt",
                     filemode="a+")

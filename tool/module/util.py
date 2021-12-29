@@ -23,6 +23,13 @@ def split_list_n_list(origin_list, n):
     for i in range(0, n):
         yield origin_list[i * cnt:(i + 1) * cnt]
 
+# 基于后续的opcode序列比较规则，对opcode序列进行去重处理
+def deal_opcode_deq(opcode_seq):
+    new_seq = ""
+    for seq in set(opcode_seq.split(" ")):
+        new_seq = new_seq + seq + " "
+    return new_seq[:-1]
+
 
 
 

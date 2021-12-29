@@ -6,7 +6,7 @@ import os
 import datetime
 import hashlib
 
-from util import valid_method_name
+from util import valid_method_name,deal_opcode_deq
 
 from androguard.core.bytecodes.dvm import DalvikVMFormat
 from androguard.core.analysis.analysis import Analysis
@@ -265,7 +265,7 @@ class ThirdLib(object):
                 class_method_md5_list.append(method_md5_value)
 
                 method_info_list.append(method_md5_value)
-                method_info_list.append(method_opcodes)
+                method_info_list.append(deal_opcode_deq(method_opcodes))# 存放的是方法内去重后的opcode序列
                 method_info_list.append(method_opcode_num)
                 method_info_list.append(method_descriptor[:-1])
 
