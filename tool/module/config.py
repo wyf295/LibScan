@@ -33,7 +33,7 @@ min_match = 0.1 # 可调
 
 
 # Log related config
-logging.basicConfig(level=logging.ERROR,
+logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - [%(lineno)d] - %(message)s',
                     filename="log.txt",
                     filemode="a+")

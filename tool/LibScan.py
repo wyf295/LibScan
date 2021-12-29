@@ -147,6 +147,9 @@ def main(lib_folder = None,
 
 if __name__ == '__main__':
     # print(sys.maxsize)
+    # # 溢出之前的结果日志
+    # if os.path.exists("log.txt"):
+    #     os.rename("log.txt")
 
     # 移除已经分析完成的apk
     for file in os.listdir("outputs"):

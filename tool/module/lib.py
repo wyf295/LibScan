@@ -251,7 +251,7 @@ class ThirdLib(object):
                 # if method_opcodes == "" or len(method_opcodes.split(" ")) > max_opcode_len:
                 #     continue
 
-                if method_opcodes == "":
+                if method_opcodes == "" or len(method_opcodes.split(" ")) > 5000:
                     continue
 
                 method_num += 1

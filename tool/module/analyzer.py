@@ -16,7 +16,7 @@ from util import split_list_n_list,deal_opcode_deq
 # 为接口或抽象类中没有方法体的方法赋予权重值参与得分计算
 abstract_method_weight = 3 # 一般不调
 # 定义允许的最大递归深度
-sys.setrecursionlimit(1000000)
+sys.setrecursionlimit(5000)
 
 def get_methods_jar_map():
     methodes_jar = {}
@@ -725,6 +725,8 @@ def search_libs_in_app(lib_dex_folder = None,
 
     # 定义多进程将所有待检测的库全部反编译，并将node_dict保存到全局内存
     processes_list_decompile = []
+    if run_thread_num > len(libs):
+        run_thread_num = len(libs)
     for sub_libs in split_list_n_list(libs, run_thread_num):
         thread = multiprocessing.Process(target=sub_decompile_lib,
                                          args=(lib_dex_folder, sub_libs, global_lib_info_dict,
@@ -742,6 +744,8 @@ def search_libs_in_app(lib_dex_folder = None,
         thread.join()
 
     # 定义多线程根据库依赖关系找出所有存在循环依赖的库，后续对于这些库的检测不考虑依赖库
+    if run_thread_num > len(global_dependence_libs):
+        run_thread_num = len(global_dependence_libs)
     if len(loop_dependence_libs) == 0:
         # print("处理依赖库")
         processes_list_libs_dependence = []
@@ -795,6 +799,8 @@ def search_libs_in_app(lib_dex_folder = None,
         # processes = 1
         # 定义多进程检测
         processes_list_detect = []
+        if run_thread_num > len(global_jar_dict):
+            run_thread_num = len(global_jar_dict)
         for i in range(1, run_thread_num + 1):
             process_name = "子进程 " + str(i)
             thread = multiprocessing.Process(target=sub_detect_lib, args=(process_name,
