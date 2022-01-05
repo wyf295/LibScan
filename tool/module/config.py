@@ -18,7 +18,8 @@ thread_num = multiprocessing.cpu_count() - 8
 # apk_lib_method_opcode_rate = 0.8 # 未使用
 
 # 在进行类粗粒度匹配时，app类中匹配方法的权重之和比上该类权重大于阈值class_similar，则视为类匹配
-class_similar = 0.8 # 很关键（基本确定）
+class_similar = 0.9 # 很关键（基本确定）
+lib_similar = 0.8
 
 # 影响不大的参数：(对于无需修改的，后续直接在程序中定义，无需抽取成可配置参数）
 # 如果大的类opcode数量是小的类opcode数量的opcode_mutiple倍，则直接不匹配，这就避免了一些仅包含小方法的apk类与很大的lib类完成了粗粒度匹配（关键）

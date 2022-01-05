@@ -29,9 +29,9 @@ class Apk(object):
         self.nodes_dict = dict()  # 记录方法内的每一个节点信息
 
         # 初始化ThirdLib对象时，解析lib对应的dex1文件
-        LOGGER.info("开始解析 %s ...", os.path.basename(apk_path))
+        LOGGER.debug("开始解析 %s ...", os.path.basename(apk_path))
         self._parse_apk(apk_path)
-        LOGGER.info("%s 解析完成", os.path.basename(apk_path))
+        LOGGER.debug("%s 解析完成", os.path.basename(apk_path))
 
     # 读取obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名
     def _parse_apk(self, apk_path):
@@ -44,7 +44,7 @@ class Apk(object):
             return 0, 0
         time_end = datetime.datetime.now()
         decompile_time = time_end - time_start
-        LOGGER.info("反编译完成，用时：%d", decompile_time.seconds)
+        LOGGER.debug("反编译完成，用时：%d", decompile_time.seconds)
 
         # 提取apk信息
         time_start = datetime.datetime.now()
@@ -244,7 +244,7 @@ class Apk(object):
                     # if method_opcodes == "" or len(method_opcodes.split(" ")) > config.max_opcode_len:
                     #     continue
 
-                    if method_opcodes == "" or len(method_opcodes.split(" ")) > 5000:
+                    if method_opcodes == "" or len(method_opcodes.split(" ")) > 3000:
                         continue
 
                     method_num += 1
@@ -303,7 +303,7 @@ class Apk(object):
 
         time_end = datetime.datetime.now()
         extract_info_time = time_end - time_start
-        LOGGER.info("解析apk完成，用时：%d", extract_info_time.seconds)
+        LOGGER.debug("解析apk完成，用时：%d", extract_info_time.seconds)
 
     # 获取每个方法的opcode序列字符串
     def _get_method_info(self, bytecode_buff, inter_method_name):

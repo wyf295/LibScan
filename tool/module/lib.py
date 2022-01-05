@@ -36,9 +36,9 @@ class ThirdLib(object):
         self.invoke_other_methodes = set() # 记录库中调用的所有方法
 
         # 初始化ThirdLib对象时，解析lib对应的dex1文件
-        LOGGER.info("开始解析 %s ...", os.path.basename(lib_path))
+        LOGGER.debug("开始解析 %s ...", os.path.basename(lib_path))
         self._parse_lib(lib_path)
-        LOGGER.info("%s 解析完成", os.path.basename(lib_path))
+        LOGGER.debug("%s 解析完成", os.path.basename(lib_path))
 
     # 读取obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名
     def _parse_lib(self, lib_path):
@@ -47,7 +47,7 @@ class ThirdLib(object):
         analysis_obj = Analysis(dex_obj)
         time_end = datetime.datetime.now()
         decompile_time = time_end - time_start
-        LOGGER.info("反编译完成，用时：%d", decompile_time.seconds)
+        LOGGER.debug("反编译完成，用时：%d", decompile_time.seconds)
 
         # 处理库名信息
         self.lib_name = os.path.basename(lib_path)
@@ -251,7 +251,7 @@ class ThirdLib(object):
                 # if method_opcodes == "" or len(method_opcodes.split(" ")) > max_opcode_len:
                 #     continue
 
-                if method_opcodes == "" or len(method_opcodes.split(" ")) > 5000:
+                if method_opcodes == "" or len(method_opcodes.split(" ")) > 3000:
                     continue
 
                 method_num += 1
@@ -327,7 +327,7 @@ class ThirdLib(object):
 
         time_end = datetime.datetime.now()
         extract_info_time = time_end - time_start
-        LOGGER.info("解析库完成，用时：%d", extract_info_time.seconds)
+        LOGGER.debug("解析库完成，用时：%d", extract_info_time.seconds)
 
     def _get_lib_name(self):
         lib = self.lib_name

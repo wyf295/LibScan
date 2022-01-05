@@ -40,7 +40,7 @@ def get_lib_name(lib):
         lib_name_dict[line[0]] = line[1]
 
     if lib_name_version not in lib_name_dict:
-        LOGGER.error("没有在obf_tpl_pkg.csv文件中找到库对应的真实名称信息：%s", lib_name_version)
+        LOGGER.debug("没有在obf_tpl_pkg.csv文件中找到库对应的真实名称信息：%s", lib_name_version)
         return ""
 
     return lib_name_dict[lib_name_version].replace("/",".")
@@ -167,9 +167,9 @@ def get_lib_info(lib,
                                    global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
                                    global_lib_info_dict, loop_dependence_libs)
             if len(result) != 0:
-                LOGGER.warning("加入其他库内容：%s", invoke_lib)
+                LOGGER.debug("加入其他库内容：%s", invoke_lib)
         else:
-            LOGGER.info("当前检测库中缺少依赖库：%s", invoke_lib)
+            LOGGER.debug("当前检测库中缺少依赖库：%s", invoke_lib)
 
         if invoke_lib_obj == None:
             continue
@@ -374,7 +374,7 @@ def coarse_match(apk_classes_dict, lib_classes_dict, filter_result, opcode_dict)
 
 # 递归的获取当前方法的完整opcode执行序列，算法：在二叉树上的中、右、左遍历（为了避免循环调用对当前方法的影响，删除会循环调用边）
 # 注意：并不是调用路径中一个方法只能出现一次，只要不会出现循环调用，可以多次调用同一个方法，比如某个tool方法，设置route_node_list来记录。
-def get_method_action(node, node_dict, method_action_dict, route_method_set, invoke_length): # 某些特殊情况下，会出现无限递归bug
+def get_method_action(node, node_dict, method_action_dict, route_method_set, invoke_length):
     # 该算法较复杂，需要实际验证是否正确
     method_name = node[:node.rfind("_")]
 
@@ -389,7 +389,7 @@ def get_method_action(node, node_dict, method_action_dict, route_method_set, inv
     cur_invoke_len = invoke_length
 
     if invoke_method_name != "" and invoke_method_name not in route_method_set and invoke_method_name + "_1" in node_dict\
-            and invoke_length <= 10:  # 调用的新方法不能是当前正在调用路径上的方法
+            and invoke_length <= 20:  # 调用的新方法不能是当前正在调用路径上的方法
         invoke_length += 1
         seq = get_method_action(invoke_method_name + "_1", node_dict, method_action_dict, route_method_set, invoke_length)
         if cur_action_seq.endswith(" "):
@@ -436,15 +436,10 @@ def fine_match(apk_obj, lib_classes_dict, lib_nodes_dict, methods_match_dict, op
             apk_pre_methods.update(set(list(methods_match_dict[apk_class][lib_class].keys())))
             lib_pre_methods.update(set(list(methods_match_dict[apk_class][lib_class].values())))
 
-    LOGGER.info("获取方法的完整路径...")
+    LOGGER.debug("获取方法的完整路径...")
     apk_methods_action = get_methods_action(apk_pre_methods, apk_nodes_dict)
     lib_methods_action = get_methods_action(lib_pre_methods, lib_nodes_dict)
-    LOGGER.info("方法完整路径获取完成...")
-    from fei.fileUtil import write_list_to_file
-    lines = []
-    for method in apk_methods_action:
-        lines.append(method + ":" + apk_methods_action[method])
-    write_list_to_file(lines,str(apk_obj.apk_name) + "_methods_opcode.txt","w")
+    LOGGER.debug("方法完整路径获取完成...")
 
     lib_class_match_result = {}  # 键为lib类名，值为列表，包含当前细粒度匹配的apk类、类中细粒度匹配的方法数、类中所有方法细粒度匹配得分之和
     finish_lib_classes = []
@@ -600,7 +595,7 @@ def detect_lib(libs_name,
         #     continue
 
         if lib_obj == None:
-            LOGGER.info("存在尚未分析完成的依赖库！")
+            LOGGER.debug("存在尚未分析完成的依赖库！")
             # print("存在依赖！")
             flag = False
             return result, flag
@@ -703,7 +698,7 @@ def search_libs_in_app(lib_dex_folder = None,
     run_thread_num = processes if processes != None else thread_num
     LOGGER.info("分析使用的cpu数：%d", run_thread_num)
 
-    LOGGER.info("开始提取所有库信息...")
+    LOGGER.debug("开始提取所有库信息...")
     time_start = datetime.datetime.now()
     libs = os.listdir(lib_dex_folder)
     random.shuffle(libs)
@@ -766,7 +761,7 @@ def search_libs_in_app(lib_dex_folder = None,
     print("所有循环依赖库如下：", loop_dependence_libs)
 
     time_end = datetime.datetime.now()
-    LOGGER.info("所有库信息提取完成, 用时：%d", (time_end - time_start).seconds)
+    LOGGER.debug("所有库信息提取完成, 用时：%d", (time_end - time_start).seconds)
 
     for apk in os.listdir(apk_folder):
         print("开始分析：", apk)
@@ -794,7 +789,6 @@ def search_libs_in_app(lib_dex_folder = None,
                 libs_list = global_jar_dict.get(lib_name, [])
                 libs_list.append(jar)
                 global_jar_dict[lib_name] = libs_list
-        LOGGER.info("检测的库个数为：%d", len(global_jar_dict))
 
         # processes = 1
         # 定义多进程检测
@@ -893,7 +887,7 @@ def search_lib_in_app(lib_dex_folder = None,
     run_thread_num = processes if processes != None else thread_num
     LOGGER.info("分析使用的cpu数：%d", run_thread_num)
 
-    LOGGER.info("开始提取库信息...")
+    LOGGER.debug("开始提取库信息...")
     time_start = datetime.datetime.now()
 
     lib_path = ""
@@ -901,7 +895,7 @@ def search_lib_in_app(lib_dex_folder = None,
         lib_path = lib_dex_folder + "/" + lib
     lib_obj = ThirdLib(lib_path)
     time_end = datetime.datetime.now()
-    LOGGER.info("库信息提取完成, 用时：%d", (time_end - time_start).seconds)
+    LOGGER.debug("库信息提取完成, 用时：%d", (time_end - time_start).seconds)
 
 
     # 定义全局待分析的apk里列表

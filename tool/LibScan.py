@@ -157,8 +157,6 @@ if __name__ == '__main__':
         if os.path.exists("apks/" + apk):
             os.remove("apks/" + apk)
 
-    sys.path.append('module/config')
-
     args = parse_arguments()
     LOGGER.setLevel(args.v)
 
@@ -171,7 +169,7 @@ if __name__ == '__main__':
     elif args.subparser_name == 'detect_all':
         main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p, model="multiple")
     else:
-        LOGGER.error("检测模式输入错误!")
+        LOGGER.debug("检测模式输入错误!")
 
     end_time = datetime.datetime.now()
     print("检测耗时：%d（单位秒）" % ((end_time - start_time).seconds))
