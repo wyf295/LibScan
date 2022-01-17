@@ -275,22 +275,19 @@ class ThirdLib(object):
             for index in class_filter:
                 self._add_filter(class_name, index, class_filter[index])
 
+            # 只考虑有非init方法的类或接口
+            if len(class_method_info_dict) == 0:
+                continue
+
             # 在分析完类中所有方法后，考虑当前类是接口或者抽象类的情况（关键：抽象类或者接口中也可以有非抽象方法）
             if len(class_method_md5_list) == 0 and (class_access_flags.find("interface") != -1 or
                                                     class_access_flags.find("abstract") != -1):
-                # 只考虑有抽象方法的接口或抽象类
-                if len(cls.get_methods()) == 0:
-                    continue
                 # 添加apk接口或抽象类中的方法数量，注意此时类值列表长度为1，而不是5
                 class_info_list = [len(cls.get_methods())]
                 self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
                 # 接口或者抽象类中的方法也统计在lib_method_num、lib_opcode_num中
                 self.lib_method_num += len(cls.get_methods())
                 self.lib_opcode_num += (len(cls.get_methods()) * abstract_method_weight)
-                continue
-
-            # 说明类中只有init构造方法，不考虑
-            if len(class_method_info_dict) == 0:
                 continue
 
             self.ground_class_flag = True
@@ -341,7 +338,8 @@ class ThirdLib(object):
             lib_name_dict[line[0]] = line[1]
 
         if lib_name_version not in lib_name_dict:
-            print("没有库名信息：", lib_name_version)
+            # print("没有库名信息：", lib_name_version)
+            return lib_name_version
 
         return lib_name_dict[lib_name_version].replace("/", ".")
 

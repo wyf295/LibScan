@@ -27,7 +27,7 @@ def get_methods_jar_map():
 
     return methodes_jar
 
-#根据obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名
+#根据obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名(如果映射文件中未定义，则直接返回库原始版本名作为库的真实名称，如：batik-dom-1.9.1）
 def get_lib_name(lib):
     lib_name_version = lib[:lib.rfind("-")]
 
@@ -41,7 +41,7 @@ def get_lib_name(lib):
 
     if lib_name_version not in lib_name_dict:
         LOGGER.debug("没有在obf_tpl_pkg.csv文件中找到库对应的真实名称信息：%s", lib_name_version)
-        return ""
+        return lib_name_version
 
     return lib_name_dict[lib_name_version].replace("/",".")
 
@@ -196,6 +196,7 @@ def deal_bloom_filter(app_class_name, app_classes_dict, lib_bloom_filter):
         if index not in lib_bloom_filter:  # 表示当前lib中不存在具有此特征的类
             return set()
 
+
         # 获取lib中所有满足该条件的类集合
         count = app_class_bloom_info[index]
         if satisfy_count == 0:
@@ -236,8 +237,8 @@ def get_satisfy_classes(apk_classes_dict, lib_classes_dict, lib_bloom_filter):
 def match(opcodes1, opcodes2, opcode_dict):
     apk_method_opcode = opcodes1.split(" ")
     lib_method_opcode = opcodes2.split(" ")
-    apk_method_len = len(apk_method_opcode)
-    lib_method_len = len(lib_method_opcode)
+    # apk_method_len = len(apk_method_opcode)
+    # lib_method_len = len(lib_method_opcode)
 
     # apk方法中opcode数量不一定大于对应的库方法中的opcode数量了，手动分析发现的
     # 在进行具体的过滤比较之前，要求apk方法opcode数量必须>=库方法，但必须小于库方法的method_mutiple = 3倍
@@ -285,6 +286,8 @@ def coarse_match(apk_classes_dict, lib_classes_dict, filter_result, opcode_dict)
             for lib_class in filter_set:
                 if lib_class in abstract_lib_match_classes:  # 为实现一对一匹配，已经完成匹配的lib类不参与匹配了
                     continue
+                # print("apk_class: ", apk_class)
+                # print("filter_set: ", filter_set)
                 if len(lib_classes_dict[lib_class]) > 1:  # 匹配的lib中的抽象类或者接口也一定要是无内容的
                     continue
 
@@ -487,6 +490,8 @@ def detect(apk_obj, lib_obj):
     :param lib_obj: 构建的库对象
     :return: 返回检测结果的字典
     '''
+    if len(lib_obj.classes_dict) == 0:
+        return {}
 
     # 读取opcode及编号，用于后面进行方法匹配
     opcode_dict = get_opcode_coding("conf/opcodes_encoding.txt")
@@ -741,7 +746,7 @@ def search_libs_in_app(lib_dex_folder = None,
     # 定义多线程根据库依赖关系找出所有存在循环依赖的库，后续对于这些库的检测不考虑依赖库
     if run_thread_num > len(global_dependence_libs):
         run_thread_num = len(global_dependence_libs)
-    if len(loop_dependence_libs) == 0:
+    if len(loop_dependence_libs) == 0 and len(global_dependence_libs) != 0:
         # print("处理依赖库")
         processes_list_libs_dependence = []
         for sub_libs in split_list_n_list(global_dependence_libs, run_thread_num):
@@ -894,6 +899,7 @@ def search_lib_in_app(lib_dex_folder = None,
     for lib in os.listdir(lib_dex_folder):
         lib_path = lib_dex_folder + "/" + lib
     lib_obj = ThirdLib(lib_path)
+
     time_end = datetime.datetime.now()
     LOGGER.debug("库信息提取完成, 用时：%d", (time_end - time_start).seconds)
 

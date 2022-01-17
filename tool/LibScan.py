@@ -135,6 +135,7 @@ def main(lib_folder = None,
     # jar_to_dex(lib_folder, lib_dex_folder)
 
     if model == "multiple":
+
         search_libs_in_app(os.path.abspath(lib_dex_folder),
                           os.path.abspath(apk_folder),
                           os.path.abspath(output_folder),

@@ -265,19 +265,16 @@ class Apk(object):
                     # 避免类中方法重载的影响，所以对于重载的方法，必须保证方法名称不同
                     class_method_info_dict[method_name] = method_info_list
 
+                # 只考虑有非init方法的类或接口
+                if len(class_method_info_dict) == 0:
+                    continue
+
                 # 在分析完类中所有方法后，考虑当前类是接口或者抽象类的情况（关键：抽象类或者接口中也可以有非抽象方法）
                 if len(class_method_md5_list) == 0 and (class_access_flags.find("interface") != -1 or
                                                         class_access_flags.find("abstract") != -1):
-                    # 只考虑有抽象方法的接口或抽象类
-                    if len(cls.get_methods()) == 0:
-                        continue
                     # 添加apk接口或抽象类中的方法数量，注意此时类值列表长度为1，而不是5
                     class_info_list = [len(cls.get_methods()), class_bloom_filter]
                     self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
-                    continue
-
-                # 说明类中只有init构造方法，不考虑
-                if len(class_method_info_dict) == 0:
                     continue
 
                 if len(class_method_md5_list) == 0:
