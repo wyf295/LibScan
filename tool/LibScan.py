@@ -135,7 +135,6 @@ def main(lib_folder = None,
     # jar_to_dex(lib_folder, lib_dex_folder)
 
     if model == "multiple":
-
         search_libs_in_app(os.path.abspath(lib_dex_folder),
                           os.path.abspath(apk_folder),
                           os.path.abspath(output_folder),
@@ -153,10 +152,10 @@ if __name__ == '__main__':
     #     os.rename("log.txt")
 
     # 移除已经分析完成的apk
-    for file in os.listdir("outputs"):
-        apk = file[:file.rfind(".")]
-        if os.path.exists("apks/" + apk):
-            os.remove("apks/" + apk)
+    # for file in os.listdir("outputs"):
+    #     apk = file[:file.rfind(".")]
+    #     if os.path.exists("apks/" + apk):
+    #         os.remove("apks/" + apk)
 
     args = parse_arguments()
     LOGGER.setLevel(args.v)

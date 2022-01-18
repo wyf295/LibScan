@@ -6,9 +6,10 @@ import datetime
 import time
 import sys
 import networkx as nx
+import math
 
 from config import (LOGGER, class_similar,
-                    min_match, thread_num)
+                    min_match, max_thread_num)
 from lib import ThirdLib
 from apk import Apk
 from util import split_list_n_list,deal_opcode_deq
@@ -182,197 +183,181 @@ def get_lib_info(lib,
     return lib_obj
 
 # 对当前app类通过布隆过滤器进行过滤，返回满足过滤条件的类集合
-def deal_bloom_filter(app_class_name, app_classes_dict, lib_bloom_filter):
-    if len(app_classes_dict[app_class_name]) == 2:  # 说明当前是一个接口或者抽象类
-        app_class_bloom_info = app_classes_dict[app_class_name][1]
+def deal_bloom_filter(lib_class_name, lib_classes_dict, app_filter):
+    if len(lib_classes_dict[lib_class_name]) == 2:  # 说明当前是一个接口或者抽象类
+        lib_class_bloom_info = lib_classes_dict[lib_class_name][1]
     else:
-        app_class_bloom_info = app_classes_dict[app_class_name][3]
+        lib_class_bloom_info = lib_classes_dict[lib_class_name][3]
 
     satisfy_classes = set()
     satisfy_count = 0
 
-    for index in app_class_bloom_info:
+    for index in lib_class_bloom_info:
 
-        if index not in lib_bloom_filter:  # 表示当前lib中不存在具有此特征的类
+        if index not in app_filter:  # 表示当前app中不存在具有此特征的类
             return set()
 
-
-        # 获取lib中所有满足该条件的类集合
-        count = app_class_bloom_info[index]
+        # 获取app中所有满足该条件的类集合
+        count = lib_class_bloom_info[index]
         if satisfy_count == 0:
-            satisfy_classes = lib_bloom_filter[index][count - 1]
+            satisfy_classes = app_filter[index][count - 1]
             satisfy_count += 1
         else:
-            satisfy_classes = satisfy_classes & lib_bloom_filter[index][count - 1]
+            satisfy_classes = satisfy_classes & app_filter[index][count - 1]
 
     return satisfy_classes
 
 
 # 处理得到apk所有类中每个类的过滤结果集，记录在filter_result字典中，并统计过滤效果信息
-def get_satisfy_classes(apk_classes_dict, lib_classes_dict, lib_bloom_filter):
+def pre_match(apk_obj, lib_obj):
     succ_filter_num = 0
-    apk_filter_set_sum = 0
+    lib_filter_set_sum = 0
+
+    lib_classes_dict = lib_obj.classes_dict
+    app_filter = apk_obj.app_filter
 
     filter_result = {}
-    for apk_class_name in apk_classes_dict:
+    for lib_class_name in lib_classes_dict:
 
-        satisfy_classes = deal_bloom_filter(apk_class_name, apk_classes_dict, lib_bloom_filter)
+        satisfy_classes = deal_bloom_filter(lib_class_name, lib_classes_dict, app_filter)
 
-        filter_result[apk_class_name] = satisfy_classes
-        apk_filter_set_sum += len(satisfy_classes)
+        filter_result[lib_class_name] = satisfy_classes
+        lib_filter_set_sum += len(satisfy_classes)
 
         if len(satisfy_classes) == 0:
             succ_filter_num += 1
 
     # apk中被过滤的类 / apk中所有的类（越大越好）
-    filter_rate = succ_filter_num / len(apk_classes_dict)
+    # filter_rate = succ_filter_num / len(lib_classes_dict)
     # apk中每个类的过滤结果集平均长度 / lib中所有的类数目（越大越好）
-    filter_effect = 1 - (apk_filter_set_sum / len(apk_classes_dict)) / len(lib_classes_dict)
+    # filter_effect = 1 - (lib_filter_set_sum / len(lib_classes_dict)) / len(apk_obj.classes_dict)
 
-    # return filter_result, succ_filter_rate, re_faid_filter_rate, filter_effect
-    return filter_result, filter_rate, filter_effect
+    # return filter_result, filter_rate, filter_effect
+    return filter_result
 
 # 采用过滤器的方式，计算是否包含，不再返回相似度，直接返回true或false（可改进：目前只考虑opcode是否出现，可以考虑加上opcode数量）
 # 采用包含的方式来判断匹配，是为了抵御控制流随机化，插入无效代码、部分代码位置随机化等
-def match(opcodes1, opcodes2, opcode_dict):
-    apk_method_opcode = opcodes1.split(" ")
-    lib_method_opcode = opcodes2.split(" ")
-    # apk_method_len = len(apk_method_opcode)
-    # lib_method_len = len(lib_method_opcode)
-
-    # apk方法中opcode数量不一定大于对应的库方法中的opcode数量了，手动分析发现的
-    # 在进行具体的过滤比较之前，要求apk方法opcode数量必须>=库方法，但必须小于库方法的method_mutiple = 3倍
-    # if apk_method_len < lib_method_len * apk_lib_method_opcode_rate or apk_method_len > 3 * lib_method_len:
-    #     return False
+def match(apk_method_opcode_list, lib_method_opcode_list, opcode_dict):
 
     # 通过过滤器的方式检测apk方法与lib方法是否匹配(库中方法的opcode必须存在于apk方法中）
     # 先使用apk方法设置过滤器的每一位
     method_bloom_filter = {}
-    for opcode in apk_method_opcode:
+    for opcode in apk_method_opcode_list:
         method_bloom_filter[opcode_dict[opcode]] = 1
 
-    # # 每opcode_error阈值位，允许有1位误差
-    # error_num = int(lib_method_len / opcode_error)
-    # # 再拿apk类来过滤器中进行匹配
-    # for opcode in lib_method_opcode:
-    #     if opcode != "" and opcode_dict[opcode] not in method_bloom_filter:
-    #         if error_num > 0:
-    #             error_num -= 1
-    #         else:
-    #             return False
-
-    # 每opcode_error阈值位，允许有1位误差
     # 再拿apk类来过滤器中进行匹配
-    for opcode in lib_method_opcode:
+    for opcode in lib_method_opcode_list:
         if opcode != "" and opcode_dict[opcode] not in method_bloom_filter:
             return False
 
     return True
 
 # 进行apk与某个lib的粗粒度匹配，得到粗粒度相似度值、所有完成匹配的apk类列表
-def coarse_match(apk_classes_dict, lib_classes_dict, filter_result, opcode_dict):
+def coarse_match(apk_obj, lib_obj, filter_result, opcode_dict):
     # 记录每个粗粒度匹配的类中具体方法的匹配关系，用于后面细粒度确定这些方法是否是真实的匹配。
-    apk_class_methods_match_dict = {}
+    # apk_class_methods_match_dict = {}
+    lib_class_match_dict = {}
     lib_match_classes = set()  # 用于计算lib的粗粒度匹配得分
     abstract_lib_match_classes = set()
+    abstract_apk_match_classes = set()
 
-    for apk_class in apk_classes_dict:
+    # 取出粗粒度匹配需要使用的数据
+    lib_classes_dict = lib_obj.classes_dict
+    apk_classes_dict = apk_obj.classes_dict
+
+    for lib_class in lib_classes_dict:
+
         class_match_dict = {}
 
-        filter_set = filter_result[apk_class]  # 注意，从布隆过滤器得到的lib类可能不存在于lib_classes_dict中
+        filter_set = filter_result[lib_class]  # 注意，从布隆过滤器得到的lib类可能不存在于lib_classes_dict中
 
-        # 记录lib中所有被匹配的抽象类或者接口（直接视为最终匹配）, 改为不考虑apk与lib中没有具体方法实现的接口或抽象类的匹配
-        if len(apk_classes_dict[apk_class]) == 2:  # 说明是apk中无方法实现的抽象类或者接口
-            for lib_class in filter_set:
-                if lib_class in abstract_lib_match_classes:  # 为实现一对一匹配，已经完成匹配的lib类不参与匹配了
+        # 记录apk中所有被匹配的抽象类或者接口（直接视为最终匹配）, 不考虑apk与lib中没有具体方法实现的接口或抽象类的匹配
+        if len(lib_classes_dict[lib_class]) == 2:  # 说明是lib中无方法实现的抽象类或者接口
+            for apk_class in filter_set:
+                if apk_class in abstract_apk_match_classes:  # 为实现一对一匹配，已经完成匹配的apk类不参与匹配了
                     continue
-                # print("apk_class: ", apk_class)
-                # print("filter_set: ", filter_set)
-                if len(lib_classes_dict[lib_class]) > 1:  # 匹配的lib中的抽象类或者接口也一定要是无内容的
+
+                if len(apk_classes_dict[apk_class]) > 1:  # 匹配的apk中的抽象类或者接口也一定要是无内容的
                     continue
 
                 apk_class_method_num = apk_classes_dict[apk_class][0]
                 lib_class_method_num = lib_classes_dict[lib_class][0]
 
                 if apk_class_method_num == lib_class_method_num:
-                    LOGGER.debug("接口匹配%s  ->  %s", apk_class, lib_class)
+                    LOGGER.debug("接口匹配%s  ->  %s", lib_class, apk_class)
+                    abstract_apk_match_classes.add(apk_class)
                     abstract_lib_match_classes.add(lib_class)
                     break
 
             continue
 
-        for lib_class in filter_set:
-            # 可能有些类存在于布隆过滤器中，但是不存在lib_classes_dict中
-            if lib_class not in lib_classes_dict:
+        for apk_class in filter_set:
+            # 可能有些类存在于app过滤器中，但是不存在apk_classes_dict中
+            if apk_class not in apk_classes_dict:
                 continue
 
-            # 保证lib中的抽象类只与apk中的抽象类匹配（因为布隆过滤器是根据<=关系过滤的，所以对于apk中的正常类，可能会被过滤出lib中的抽象类）
-            if len(lib_classes_dict[lib_class]) == 1:
+            # 保证apk中的抽象类只与lib中的抽象类匹配（因为布隆过滤器是根据<=关系过滤的，所以对于lib中的正常类，可能会被过滤出apk中的抽象类）
+            if len(apk_classes_dict[apk_class]) == 1:
                 continue
 
             # lib类中的方法数必须大于等于该apk类
-            # if apk_classes_dict[apk_class][1] > lib_classes_dict[lib_class][1] + 2:
-            #     continue
             if apk_classes_dict[apk_class][1] > lib_classes_dict[lib_class][1]:
                 continue
 
-            # 如果大的类opcode数是小的opcode_mutiple = 5倍以上，则不匹配
-            # max_opcodes_num = max(apk_classes_dict[apk_class][2], lib_classes_dict[lib_class][2])
-            # min_opcodes_num = min(apk_classes_dict[apk_class][2], lib_classes_dict[lib_class][2])
-            # if max_opcodes_num / min_opcodes_num > 2:
-            #     continue
-
-            # 进行类中方法的一对一匹配，目的是得到apk类中所有完成一对一匹配的方法（可以考虑使用按类中方法先后顺序完成一对一匹配，也可以每次寻找最大相似度匹配）
+            # 进行类中方法的一对一匹配，目的是得到lib类中所有完成一对一匹配的方法（每次寻找最大相似度匹配）
             methods_match_dict = {}  # 用于记录apk中类方法与对应的lib类方法匹配关系
-            apk_class_methods_dict = apk_classes_dict[apk_class][4]
-            lib_class_methods_dict = lib_classes_dict[lib_class][3]
-            lib_match_methods = []  # 保证lib类中的方法不会被重复匹配
-            for method1 in apk_class_methods_dict:
+            apk_class_methods_dict = apk_classes_dict[apk_class][3]
+            lib_class_methods_dict = lib_classes_dict[lib_class][4]
+            apk_match_methods = []  # 保证apk类中的方法不会被重复匹配
+            for lib_method in lib_class_methods_dict:
 
-                match_lib_method_opcode_num = 0 # 用于记录与当前apk类方法匹配的库方法的opcode数量，在匹配的前提下，该数值越大，应该匹配度越高
+                # 用于记录apk方法中opcode与lib方法中去重opcode数量差值，将差值最小的视为最佳匹配
+                min_method_diff_opcodes = sys.maxsize # 用于记录匹配的apk方法中去重后的opcode数量，在匹配的前提下，该数值越小，匹配度越高
 
-                for method2 in lib_class_methods_dict:
+                for apk_method in apk_class_methods_dict:
 
-                    if method2 in lib_match_methods:
+                    if apk_method in apk_match_methods:
                         continue
 
                     # 先判断方法的descriptor是否完全相同，如果不同，则无需内容匹配
-                    if apk_class_methods_dict[method1][3] != lib_class_methods_dict[method2][3]:
+                    if apk_class_methods_dict[apk_method][3] != lib_class_methods_dict[lib_method][3]:
                         continue
 
                     # 尝试匹配方法整体MD5值
-                    if apk_class_methods_dict[method1][0] == lib_class_methods_dict[method2][0]:
-                        if method1 in methods_match_dict:  # 说明之前有匹配的方法已经存入methods_match_dict与lib_match_methods
-                            lib_match_methods.remove(methods_match_dict[method1])
-                        methods_match_dict[method1] = method2
-                        lib_match_methods.append(method2)
+                    if apk_class_methods_dict[apk_method][0] == lib_class_methods_dict[lib_method][0]:
+                        if lib_method in methods_match_dict:  # 说明之前有匹配的方法已经存入methods_match_dict 与 apk_match_methods
+                            apk_match_methods.remove(methods_match_dict[lib_method])
+                        methods_match_dict[lib_method] = apk_method
+                        apk_match_methods.append(apk_method)
                         break
 
-                    if match(apk_class_methods_dict[method1][1], lib_class_methods_dict[method2][1], opcode_dict):
-                        lib_method_len = lib_class_methods_dict[method2][2]
-                        # 必须遍历库类中的所有方法，找出最合适的方法完成匹配
-                        if lib_method_len > match_lib_method_opcode_num:
-                            if method1 in methods_match_dict: # 说明之前有匹配的方法已经存入methods_match_dict与lib_match_methods
-                                lib_match_methods.remove(methods_match_dict[method1])
-                            methods_match_dict[method1] = method2
-                            lib_match_methods.append(method2)
-                            match_lib_method_opcode_num = lib_method_len
+                    apk_method_opcodes = apk_class_methods_dict[apk_method][1].split(" ")
+                    lib_method_opcodes = lib_class_methods_dict[lib_method][1].split(" ")
+                    if match(apk_method_opcodes, lib_method_opcodes, opcode_dict):
+                        method_diff_opcodes = math.fabs(apk_class_methods_dict[apk_method][2] - lib_class_methods_dict[lib_method][2])
+                        # 必须遍历apk类中的所有方法，找出最合适的方法完成匹配
+                        if method_diff_opcodes < min_method_diff_opcodes:
+                            if lib_method in methods_match_dict: # 说明之前有匹配的方法已经存入methods_match_dict与lib_match_methods
+                                apk_match_methods.remove(methods_match_dict[lib_method])
+                            methods_match_dict[lib_method] = apk_method
+                            apk_match_methods.append(apk_method)
+                            min_method_diff_opcodes = method_diff_opcodes
 
             # 根据apk类中完成匹配的方法确定类是否匹配
             match_methods_weight = 0
-            for method in methods_match_dict.keys():
-                match_methods_weight += apk_class_methods_dict[method][2]
+            for apk_method in methods_match_dict.values():
+                match_methods_weight += apk_class_methods_dict[apk_method][2]
             class_weight = apk_classes_dict[apk_class][2]
 
             if match_methods_weight / class_weight > class_similar:  # 如果apk类中匹配方法的权重之和 / 类总权重 > 阈值，则类粗粒度匹配
                 lib_match_classes.add(lib_class)
-                class_match_dict[lib_class] = methods_match_dict
+                class_match_dict[apk_class] = methods_match_dict
 
         # 记录apk类与所有lib类粗粒度匹配的详细信息
         if len(class_match_dict) != 0:
-            apk_class_methods_match_dict[apk_class] = class_match_dict
+            lib_class_match_dict[lib_class] = class_match_dict
 
-    return lib_match_classes, abstract_lib_match_classes, apk_class_methods_match_dict
+    return lib_match_classes, abstract_lib_match_classes, lib_class_match_dict
 
 
 # 递归的获取当前方法的完整opcode执行序列，算法：在二叉树上的中、右、左遍历（为了避免循环调用对当前方法的影响，删除会循环调用边）
@@ -426,18 +411,20 @@ def get_methods_action(method_list, node_dict):
 
     return method_action_dict
 
-
 # 细粒度匹配
-def fine_match(apk_obj, lib_classes_dict, lib_nodes_dict, methods_match_dict, opcode_dict):
+def fine_match(apk_obj, lib_obj, lib_class_match_dict, opcode_dict):
     apk_nodes_dict = apk_obj.nodes_dict
+    lib_nodes_dict = lib_obj.nodes_dict
+    apk_classes_dict = apk_obj.classes_dict
+    lib_classes_dict = lib_obj.classes_dict
     # 根据粗粒度匹配结果进行细粒度匹配
     # 1、获取所有需要比较的方法opcode执行序列，并记录到自定methods_action = {method_name: opcode_seq}（可改进：多线程获取）
     apk_pre_methods = set()
     lib_pre_methods = set()
-    for apk_class in methods_match_dict:
-        for lib_class in methods_match_dict[apk_class]:
-            apk_pre_methods.update(set(list(methods_match_dict[apk_class][lib_class].keys())))
-            lib_pre_methods.update(set(list(methods_match_dict[apk_class][lib_class].values())))
+    for lib_class in lib_class_match_dict:
+        for apk_class in lib_class_match_dict[lib_class]:
+            apk_pre_methods.update(set(list(lib_class_match_dict[lib_class][apk_class].values())))
+            lib_pre_methods.update(set(list(lib_class_match_dict[lib_class][apk_class].keys())))
 
     LOGGER.debug("获取方法的完整路径...")
     apk_methods_action = get_methods_action(apk_pre_methods, apk_nodes_dict)
@@ -445,40 +432,43 @@ def fine_match(apk_obj, lib_classes_dict, lib_nodes_dict, methods_match_dict, op
     LOGGER.debug("方法完整路径获取完成...")
 
     lib_class_match_result = {}  # 键为lib类名，值为列表，包含当前细粒度匹配的apk类、类中细粒度匹配的方法数、类中所有方法细粒度匹配得分之和
-    finish_lib_classes = []
-    for apk_class in methods_match_dict:
-        lib_class_match_method_opcodes = 0  # 记录最大方法得分情况下的库中方法的opcode数量
-        lib_class_match_method_num = 0
-        class_score = 0  # 记录类最大方法得分之和
-        max_lib_class = ""  # 记录最大方法得分对应的lib类名
+    finish_apk_classes = []
+    for lib_class in lib_class_match_dict:
+        max_match_class_opcodes = 0  # 记录最大得分情况下的库中方法的opcode数量之和
+        # 在库类被匹配方法opcode数量相同时，为了找出最佳匹配的apk类，记录类中所有匹配的方法完整opcode序列去重后的差值之和，将方法差值之和最小的视为最佳匹配
+        min_class_diff_opcodes = sys.maxsize
+        match_apk_class = ""  # 记录最大方法得分对应的lib类名
         # 从apk类对lib类的一对多匹配，筛选出一对一匹配
-        for lib_class in methods_match_dict[apk_class]:
+        for apk_class in lib_class_match_dict[lib_class]:
 
-            if lib_class in finish_lib_classes:
+            if apk_class in finish_apk_classes:
                 continue
 
             match_method_num = 0
-            methods_opcodes_num = 0  # 记录当前库类中细粒度匹配的所有方法opcode数量之和
-            for k, v in methods_match_dict[apk_class][lib_class].items():
-                if match(apk_methods_action[k], lib_methods_action[v], opcode_dict):
+            cur_match_class_opcodes = 0  # 记录当前库类中细粒度匹配的所有方法opcode数量之和
+            cur_class_diff_opcodes = 0  # 记录当前匹配类的完整opcode序列操作码数量差值之和
+            for lib_method, apk_method in lib_class_match_dict[lib_class][apk_class].items():
+                apk_method_opcodes = apk_methods_action[apk_method].split(" ")
+                lib_method_opcodes = lib_methods_action[lib_method].split(" ")
+                if match(apk_method_opcodes, lib_method_opcodes, opcode_dict):
                     # 将当前完成细粒度匹配的lib方法opcode数量加上
-                    methods_opcodes_num += lib_classes_dict[lib_class][3][v][2]
+                    cur_match_class_opcodes += lib_classes_dict[lib_class][4][lib_method][2]
+                    cur_class_diff_opcodes += math.fabs((apk_classes_dict[apk_class][3][apk_method][2] - lib_classes_dict[lib_class][4][lib_method][2]))
                     match_method_num += 1
 
-            if methods_opcodes_num > class_score:
-                lib_class_match_method_num = match_method_num
-                lib_class_match_method_opcodes = methods_opcodes_num
-                class_score = methods_opcodes_num
-                max_lib_class = lib_class
+            if (cur_match_class_opcodes > max_match_class_opcodes) or \
+                    (cur_match_class_opcodes == max_match_class_opcodes and cur_class_diff_opcodes < min_class_diff_opcodes):
+                max_match_class_opcodes = cur_match_class_opcodes
+                min_class_diff_opcodes = cur_class_diff_opcodes
+                match_apk_class = apk_class
 
-        # 从apk类对lib类的多对一匹配，筛选出一对一匹配，最终得分一对一匹配
-        if max_lib_class == "":
+        # 从lib类对apk类的一对多匹配，筛选出一对一匹配
+        if match_apk_class == "":
             continue
 
-        match_info = [apk_class, lib_class_match_method_opcodes, class_score,
-                      lib_class_match_method_num]  # 只考虑细粒度匹配的方法中额的opcode数量
-        lib_class_match_result[max_lib_class] = match_info
-        finish_lib_classes.append(max_lib_class)
+        match_info = [match_apk_class, max_match_class_opcodes]  # 只考虑细粒度匹配的方法中额的opcode数量
+        lib_class_match_result[lib_class] = match_info
+        finish_apk_classes.append(match_apk_class)
 
     return lib_class_match_result
 
@@ -504,69 +494,79 @@ def detect(apk_obj, lib_obj):
     # 检测库平均用时
     avg_time = 0
 
+    # 通过过滤器为库中的每个类找出app中的潜在匹配类集合
+    filter_result = pre_match(apk_obj,lib_obj)
+    for lib_class in filter_result:
+        LOGGER.debug("预匹配lib_class: %s", lib_class)
+        for apk_class in filter_result[lib_class]:
+            LOGGER.debug("apk_class: %s", apk_class)
+        LOGGER.debug("-------------------------------")
+
+    # avg_filter_rate += filter_rate
+    # LOGGER.debug("filter_rate: %f", filter_rate)
+    # LOGGER.debug("filter_effect: %f", filter_effect)
+
+    # 进行粗粒度匹配
+    lib_match_classes, abstract_lib_match_classes, lib_class_match_dict = coarse_match(apk_obj,
+                                                                                       lib_obj,
+                                                                                       filter_result,
+                                                                                       opcode_dict)
+    for lib_class in lib_class_match_dict:
+        LOGGER.debug("粗粒度匹配lib_class: %s", lib_class)
+        for apk_class in lib_class_match_dict[lib_class]:
+            LOGGER.debug("apk_class: %s", apk_class)
+        LOGGER.debug("-------------------------------")
+
     # 获取库对象中的信息
     lib_opcode_num = lib_obj.lib_opcode_num
     lib_classes_dict = lib_obj.classes_dict
-    lib_filter = lib_obj.lib_filter
-    lib_nodes_dict = lib_obj.nodes_dict
-
-    # 通过布隆过滤器得到每个app类可能匹配的lib类集合与三个过滤指标
-    filter_result, filter_rate, filter_effect = get_satisfy_classes(apk_obj.classes_dict,
-                                                                    lib_classes_dict,
-                                                                    lib_filter)
-    avg_filter_rate += filter_rate
-    LOGGER.debug("filter_rate: %f", filter_rate)
-    LOGGER.debug("filter_effect: %f", filter_effect)
-
-    # 进行粗粒度匹配
-    lib_match_classes, abstract_lib_match_classes, methods_match_dict = coarse_match(apk_obj.classes_dict,
-                                                                                     lib_classes_dict,
-                                                                                     filter_result,
-                                                                                     opcode_dict)
 
     # 计算lib粗粒度匹配得分
-    lib_match_class_score = 0
+    lib_coarse_match_opcode_num = 0
     for lib_class in lib_match_classes:
-        lib_match_class_score += lib_classes_dict[lib_class][2]
+        lib_coarse_match_opcode_num += lib_classes_dict[lib_class][2]
     for abstract_class in abstract_lib_match_classes:
-        lib_match_class_score += (lib_classes_dict[abstract_class][0] * abstract_method_weight)
+        lib_coarse_match_opcode_num += (lib_classes_dict[abstract_class][0] * abstract_method_weight)
 
-    lib_match_rate = lib_match_class_score / lib_opcode_num
-    LOGGER.debug("lib粗粒度匹配的类中所有opcode数量：%d", lib_match_class_score)
-    LOGGER.debug("lib粗粒度率：%f", lib_match_rate)
+    lib_coarse_match_rate = lib_coarse_match_opcode_num / lib_opcode_num
+    LOGGER.debug("lib粗粒度匹配的类中所有opcode数量：%d", lib_coarse_match_opcode_num)
+    LOGGER.debug("lib粗粒度率：%f", lib_coarse_match_rate)
     LOGGER.debug("库中匹配的类数：%d", len(lib_match_classes) + len(abstract_lib_match_classes))
     LOGGER.debug("库中所有参与匹配的类数：%d", len(lib_classes_dict))
 
-    if lib_match_rate < min_match:  # 当粗粒度匹配得分极小时，直接不包含，无需进行细粒度匹配
-        LOGGER.debug("极小匹配库：%s，粗粒度匹配率为：%f", lib_obj.lib_name, lib_match_rate)
+    if lib_coarse_match_rate < min_match:  # 当粗粒度匹配得分极小时，直接不包含，无需进行细粒度匹配
+        LOGGER.debug("极小匹配库：%s，粗粒度匹配率为：%f", lib_obj.lib_name, lib_coarse_match_rate)
         return {}
 
     # 进行细粒度匹配
     lib_class_match_result = fine_match(apk_obj,
-                                        lib_classes_dict,
-                                        lib_nodes_dict,
-                                        methods_match_dict,
+                                        lib_obj,
+                                        lib_class_match_dict,
                                         opcode_dict)
+    for lib_class in lib_class_match_result:
+        LOGGER.debug("细粒度：库类%s → 应用程序类%s",lib_class,lib_class_match_result[lib_class][0])
+    LOGGER.debug("库中细粒度无匹配的类如下：")
+    for lib_class in lib_classes_dict:
+        if lib_class not in abstract_lib_match_classes and lib_class not in lib_class_match_result:
+            LOGGER.debug("lib_class: %s", lib_class)
 
     # 根据细粒度匹配结果，统计匹配的方法数之和以及所有方法细粒度匹配得分之和作为lib匹配得分
     # 每个方法包含的内容多少不一样，大方法匹配与小方法匹配的意义也不一样，所以，统计方法匹配个数没有意义。
-    final_match_method_opcodes = 0
-    final_match_method_num = 0
+    final_match_opcodes = 0
     for lib_class in lib_class_match_result:
-        final_match_method_opcodes += lib_class_match_result[lib_class][1]
-        final_match_method_num += lib_class_match_result[lib_class][3]
+        final_match_opcodes += lib_class_match_result[lib_class][1]
 
     # 考虑接口与抽象类匹配结果
     for lib_class in abstract_lib_match_classes:
-        final_match_method_opcodes += (lib_classes_dict[lib_class][0] * abstract_method_weight)
+        final_match_opcodes += (lib_classes_dict[lib_class][0] * abstract_method_weight)
 
     # 设置阈值自适应（可改进：寻找合适的函数来代替手动自适应）
     min_lib_match3 = 0.1
     # if lib_opcode_num < 100:
     #     min_lib_match3 = 0.7
 
-    temp_list = [final_match_method_opcodes, lib_opcode_num, final_match_method_opcodes / lib_opcode_num]
-    if final_match_method_opcodes / lib_opcode_num > min_lib_match3:
+    temp_list = [final_match_opcodes, lib_opcode_num, final_match_opcodes / lib_opcode_num]
+    if final_match_opcodes / lib_opcode_num > min_lib_match3:
         LOGGER.debug("包含")
         result[lib_obj.lib_name] = temp_list
 
@@ -588,6 +588,7 @@ def detect_lib(libs_name,
     lib_versions_dict = {}
     libs_name.reverse()
     for lib in libs_name:
+        LOGGER.debug("开始检测库：%s", lib)
 
         cur_libs = set()
         # 处理库依赖关系
@@ -699,9 +700,9 @@ def search_libs_in_app(lib_dex_folder = None,
                       processes = None):
     methodes_jar = get_methods_jar_map()
 
-    # 设置分析的cpu数量
-    run_thread_num = processes if processes != None else thread_num
-    LOGGER.info("分析使用的cpu数：%d", run_thread_num)
+    # 设置分析的cpu数量上限
+    thread_num = processes if processes != None else max_thread_num
+    LOGGER.info("分析最大使用的cpu数：%d", thread_num)
 
     LOGGER.debug("开始提取所有库信息...")
     time_start = datetime.datetime.now()
@@ -725,9 +726,8 @@ def search_libs_in_app(lib_dex_folder = None,
 
     # 定义多进程将所有待检测的库全部反编译，并将node_dict保存到全局内存
     processes_list_decompile = []
-    if run_thread_num > len(libs):
-        run_thread_num = len(libs)
-    for sub_libs in split_list_n_list(libs, run_thread_num):
+    decompile_thread_num = thread_num if thread_num <= len(libs) else len(libs)
+    for sub_libs in split_list_n_list(libs, decompile_thread_num):
         thread = multiprocessing.Process(target=sub_decompile_lib,
                                          args=(lib_dex_folder, sub_libs, global_lib_info_dict,
                                                shared_lock_lib_info, methodes_jar,
@@ -743,13 +743,15 @@ def search_libs_in_app(lib_dex_folder = None,
     for thread in processes_list_decompile:
         thread.join()
 
+    print("所有库信息提取完成...")
+
     # 定义多线程根据库依赖关系找出所有存在循环依赖的库，后续对于这些库的检测不考虑依赖库
-    if run_thread_num > len(global_dependence_libs):
-        run_thread_num = len(global_dependence_libs)
-    if len(loop_dependence_libs) == 0 and len(global_dependence_libs) != 0:
+    if len(global_dependence_libs) != 0:
+        dependence_deal_thread_num = thread_num if thread_num <= len(global_dependence_libs) else len(global_dependence_libs)
+
         # print("处理依赖库")
         processes_list_libs_dependence = []
-        for sub_libs in split_list_n_list(global_dependence_libs, run_thread_num):
+        for sub_libs in split_list_n_list(global_dependence_libs, dependence_deal_thread_num):
             thread = multiprocessing.Process(target=sub_find_loop_dependence_libs,
                                              args=(sub_libs, global_dependence_relation, loop_dependence_libs,
                                                    shared_lock_loop_libs))
@@ -763,7 +765,7 @@ def search_libs_in_app(lib_dex_folder = None,
         for thread in processes_list_libs_dependence:
             thread.join()
 
-    print("所有循环依赖库如下：", loop_dependence_libs)
+    print("循环依赖库如下：", loop_dependence_libs)
 
     time_end = datetime.datetime.now()
     LOGGER.debug("所有库信息提取完成, 用时：%d", (time_end - time_start).seconds)
@@ -798,9 +800,8 @@ def search_libs_in_app(lib_dex_folder = None,
         # processes = 1
         # 定义多进程检测
         processes_list_detect = []
-        if run_thread_num > len(global_jar_dict):
-            run_thread_num = len(global_jar_dict)
-        for i in range(1, run_thread_num + 1):
+        detect_thread_num = thread_num if thread_num <= len(global_jar_dict) else len(global_jar_dict)
+        for i in range(1, detect_thread_num + 1):
             process_name = "子进程 " + str(i)
             thread = multiprocessing.Process(target=sub_detect_lib, args=(process_name,
                                                                       global_jar_dict,
@@ -889,8 +890,8 @@ def search_lib_in_app(lib_dex_folder = None,
                       processes = None):
 
     # 设置分析的cpu数量
-    run_thread_num = processes if processes != None else thread_num
-    LOGGER.info("分析使用的cpu数：%d", run_thread_num)
+    thread_num = processes if processes != None else max_thread_num
+    LOGGER.info("分析使用的cpu数：%d", thread_num)
 
     LOGGER.debug("开始提取库信息...")
     time_start = datetime.datetime.now()
@@ -917,7 +918,7 @@ def search_lib_in_app(lib_dex_folder = None,
     # 定义apk级多线程检测
     print("开始检测...")
     processes_list_detect = []
-    for i in range(1, run_thread_num + 1):
+    for i in range(1, thread_num + 1):
         process_name = str(i)
         thread = multiprocessing.Process(target=sub_detect_apk, args=(process_name,
                                                                       lib_obj,

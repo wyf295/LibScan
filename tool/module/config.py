@@ -5,7 +5,7 @@ import multiprocessing
 # 定义运行的线程数
 import sys
 
-thread_num = multiprocessing.cpu_count() - 8
+max_thread_num = multiprocessing.cpu_count() - 4
 
 # 影响较大的参数：
 # 当方法内opcode数量或者方法执行路径opcode数量大于该值时，不考虑（关键）

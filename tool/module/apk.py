@@ -27,6 +27,7 @@ class Apk(object):
         # 后续用于匹配的库信息
         self.classes_dict = dict() # 记录apk中的所有类信息
         self.nodes_dict = dict()  # 记录方法内的每一个节点信息
+        self.app_filter = dict() # 应用程序过滤器，记录app类中包含的一些特征信息
 
         # 初始化ThirdLib对象时，解析lib对应的dex1文件
         LOGGER.debug("开始解析 %s ...", os.path.basename(apk_path))
@@ -62,7 +63,7 @@ class Apk(object):
                 class_info_list = []
                 method_num = 0  # 记录类中参与匹配的方法数量
                 class_opcode_num = 0  # 记录每个类中参与匹配的opcode个数
-                class_bloom_filter = {}  # 类过滤器，记录当前类在布隆过滤器中的各项位置信息
+                class_filter = {}  # 类过滤器，记录当前类在布隆过滤器中的各项位置信息
                 class_method_md5_list = []
                 class_method_info_dict = {}
 
@@ -72,17 +73,17 @@ class Apk(object):
 
                 # print(class_access_flags)
                 if class_access_flags == "0x0" or class_access_flags == "public":
-                    class_bloom_filter[1] = 1
+                    class_filter[1] = 1
                 elif class_access_flags.find("interface") != -1:
-                    class_bloom_filter[2] = 1
+                    class_filter[2] = 1
                 elif class_access_flags.find("interface") == -1 and class_access_flags.find("abstract") != -1:
-                    class_bloom_filter[3] = 1
+                    class_filter[3] = 1
                 elif class_access_flags.find("enum") != -1:
-                    class_bloom_filter[4] = 1
+                    class_filter[4] = 1
                 elif class_access_flags.find("static") != -1:
-                    class_bloom_filter[5] = 1
+                    class_filter[5] = 1
                 if super_class_name != "Ljava/lang/Object;":
-                    class_bloom_filter[6] = 1
+                    class_filter[6] = 1
 
                 # 获取并记录字段在布隆过滤器中的如下信息：有final、无final、有static、无static、java引用类型字段、Android引用类型字段、java基本类型字段（8种）、其他引用类型字段
                 # 定义类型字典
@@ -90,7 +91,7 @@ class Apk(object):
                 JAVA_BASIC_TYPR_ARR_DICT = {"[B": 13, "[S": 14, "[I": 15, "[J": 16, "[F": 17, "[D": 18, "[Z": 19, "[C": 20}
                 RETURN_JAVA_BASIC_TYPR_DICT = {"B": 4, "S": 5, "I": 6, "J": 7, "F": 8, "D": 9, "Z": 10, "C": 11, "V": 12}
                 if len(cls.get_fields()) == 0:  # 无字段
-                    class_bloom_filter[7] = 1
+                    class_filter[7] = 1
                 else:
                     for EncodedField_obj in cls.get_fields():
                         a = 1
@@ -120,7 +121,7 @@ class Apk(object):
                             b = 22
 
                         # 将字段信息加入类过滤器中
-                        self._add_class_filter(class_bloom_filter, 7 + (a - 1) * 22 + b)
+                        self._add_class_filter(class_filter, 7 + (a - 1) * 22 + b)
 
                 for method in cls.get_methods():
 
@@ -147,7 +148,7 @@ class Apk(object):
                     elif method_return_value.startswith("Ljava/lang/String"):
                         m = 2
                         method_descriptor += "Ljava/lang/String/ "
-                    elif method_return_value.startswith("Ljava"):
+                    elif method_return_value.startswith("Ljava/"):
                         m = 3
                         method_descriptor += "Ljava/ "
                     elif method_return_value in RETURN_JAVA_BASIC_TYPR_DICT:
@@ -226,7 +227,7 @@ class Apk(object):
                             n = 16
 
                     # 将类中方法信息加入类过滤器中
-                    self._add_class_filter(class_bloom_filter, 51 + (k - 1) * 368 + (m - 1) * 16 + n)
+                    self._add_class_filter(class_filter, 51 + (k - 1) * 368 + (m - 1) * 16 + n)
 
                     method_name = valid_method_name(method.full_name)
 
@@ -265,19 +266,23 @@ class Apk(object):
                     # 避免类中方法重载的影响，所以对于重载的方法，必须保证方法名称不同
                     class_method_info_dict[method_name] = method_info_list
 
-                # 只考虑有非init方法的类或接口
-                if len(class_method_info_dict) == 0:
-                    continue
+                # 将当前类过滤器class_bloom_filter合并到库过滤器中lib_bloom_filter中
+                for index in class_filter:
+                    self._add_filter(class_name, index, class_filter[index])
 
-                # 在分析完类中所有方法后，考虑当前类是接口或者抽象类的情况（关键：抽象类或者接口中也可以有非抽象方法）
-                if len(class_method_md5_list) == 0 and (class_access_flags.find("interface") != -1 or
-                                                        class_access_flags.find("abstract") != -1):
+                # 只考虑有非init方法的类或接口
+                # if len(class_method_info_dict) == 0:
+                #     continue
+
+                # 在分析完类中所有方法后，考虑当前类是接口或者抽象类的情况
+                if (class_access_flags.find("interface") != -1 or class_access_flags.find("abstract") != -1)\
+                        and len(class_method_info_dict) == 0: # 从java8开始，抽象类或者接口中也可以有非抽象方法
                     # 添加apk接口或抽象类中的方法数量，注意此时类值列表长度为1，而不是5
-                    class_info_list = [len(cls.get_methods()), class_bloom_filter]
+                    class_info_list = [len(cls.get_methods())]
                     self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
                     continue
 
-                if len(class_method_md5_list) == 0:
+                if len(class_method_info_dict) == 0:
                     continue
 
                 class_method_md5_list.sort()
@@ -293,7 +298,6 @@ class Apk(object):
                 class_info_list.append(class_md5_value)
                 class_info_list.append(method_num)
                 class_info_list.append(class_opcode_num)
-                class_info_list.append(class_bloom_filter)
                 class_info_list.append(class_method_info_dict)
 
                 self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
@@ -357,6 +361,16 @@ class Apk(object):
             count = filter_record_limit
         class_filter[index] = count
 
+     # 将app中的类名添加到布隆过滤器中合适位置里的集合中
+    def _add_filter(self, class_name, index, num):
+        contain_list = self.app_filter.get(index, [set() for i in range(filter_record_limit)])
+        set_index = int(num) - 1
+        if set_index > filter_record_limit:
+            set_index = filter_record_limit
+        class_set = contain_list.pop(set_index)
+        class_set.add(class_name)
+        contain_list.insert(set_index, class_set)
+        self.app_filter[index] = contain_list
 
 
 

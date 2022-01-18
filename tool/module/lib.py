@@ -29,7 +29,7 @@ class ThirdLib(object):
         # 后续用于匹配的库信息
         self.lib_opcode_num = int()  # 库中的opcode数量之和
         self.classes_dict = dict() # 记录库中的所有类信息
-        self.lib_filter = dict() # 库过滤器，记录库类中包含的一些特征信息
+        # self.lib_filter = dict() # 库过滤器，记录库类中包含的一些特征信息
         self.nodes_dict = dict()  # 记录方法内的每一个节点信息
         self.lib_method_num = int() # 记录库中所有方法数量
         self.ground_class_flag = False  # 记录库中是否有非抽象类或接口的类，默认无
@@ -60,6 +60,7 @@ class ThirdLib(object):
         for cls in dex_obj.get_classes():
 
             class_name = cls.get_name().replace("/", ".")[1:-1]
+            # print("处理类：", class_name)
 
             class_name_short = class_name[class_name.rfind(".") + 1:]
             if class_name_short.startswith("R$"):  # 不考虑资源类
@@ -272,18 +273,17 @@ class ThirdLib(object):
                 class_method_info_dict[method_name] = method_info_list
 
             # 将当前类过滤器class_bloom_filter合并到库过滤器中lib_bloom_filter中
-            for index in class_filter:
-                self._add_filter(class_name, index, class_filter[index])
-
+            # for index in class_filter:
+            #     self._add_filter(class_name, index, class_filter[index])
             # 只考虑有非init方法的类或接口
-            if len(class_method_info_dict) == 0:
-                continue
+            # if len(class_method_info_dict) == 0:
+            #     continue
 
-            # 在分析完类中所有方法后，考虑当前类是接口或者抽象类的情况（关键：抽象类或者接口中也可以有非抽象方法）
-            if len(class_method_md5_list) == 0 and (class_access_flags.find("interface") != -1 or
-                                                    class_access_flags.find("abstract") != -1):
+            # 在分析完类中所有方法后，考虑当前类是接口或者抽象类的情况
+            if (class_access_flags.find("interface") != -1 or class_access_flags.find("abstract") != -1) \
+                    and len(class_method_info_dict) == 0:  # 从java8开始，抽象类或者接口中也可以有非抽象方法
                 # 添加apk接口或抽象类中的方法数量，注意此时类值列表长度为1，而不是5
-                class_info_list = [len(cls.get_methods())]
+                class_info_list = [len(cls.get_methods()), class_filter]
                 self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
                 # 接口或者抽象类中的方法也统计在lib_method_num、lib_opcode_num中
                 self.lib_method_num += len(cls.get_methods())
@@ -292,7 +292,7 @@ class ThirdLib(object):
 
             self.ground_class_flag = True
 
-            if len(class_method_md5_list) == 0:
+            if len(class_method_info_dict) == 0:
                 continue
 
             self.lib_opcode_num += class_opcode_num
@@ -309,6 +309,7 @@ class ThirdLib(object):
             class_info_list.append(class_md5_value)
             class_info_list.append(method_num)
             class_info_list.append(class_opcode_num)
+            class_info_list.append(class_filter)
             class_info_list.append(class_method_info_dict)
             self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
 
@@ -321,6 +322,8 @@ class ThirdLib(object):
             if invoke_method + "_1" not in self.nodes_dict and invoke_class not in self.classes_dict:
                 invoke_other_methodes.add(invoke_method)
         self.invoke_other_methodes = invoke_other_methodes
+
+        # print("classes_dict: ", self.classes_dict)
 
         time_end = datetime.datetime.now()
         extract_info_time = time_end - time_start
@@ -400,15 +403,15 @@ class ThirdLib(object):
         class_filter[index] = count
 
     # 将lib中的类名添加到布隆过滤器中合适位置里的集合中
-    def _add_filter(self, class_name, index, num):
-        contain_list = self.lib_filter.get(index, [set() for i in range(filter_record_limit)])
-        set_index = int(num) - 1
-        if set_index > filter_record_limit:
-            set_index = filter_record_limit
-        class_set = contain_list.pop(set_index)
-        class_set.add(class_name)
-        contain_list.insert(set_index, class_set)
-        self.lib_filter[index] = contain_list
+    # def _add_filter(self, class_name, index, num):
+    #     contain_list = self.lib_filter.get(index, [set() for i in range(filter_record_limit)])
+    #     set_index = int(num) - 1
+    #     if set_index > filter_record_limit:
+    #         set_index = filter_record_limit
+    #     class_set = contain_list.pop(set_index)
+    #     class_set.add(class_name)
+    #     contain_list.insert(set_index, class_set)
+    #     self.lib_filter[index] = contain_list
 
 
 
