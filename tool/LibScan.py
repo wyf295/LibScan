@@ -134,23 +134,18 @@ def main(lib_folder = None,
     # arr_to_jar(lib_folder)
     # jar_to_dex(lib_folder, lib_dex_folder)
 
-    if model == "multiple":
+    if model == "multiple": # 在库级别并行分析
         search_libs_in_app(os.path.abspath(lib_dex_folder),
                           os.path.abspath(apk_folder),
                           os.path.abspath(output_folder),
                           processes)
-    elif model == "one":
+    elif model == "one": #在apk级别并行分析
         search_lib_in_app(os.path.abspath(lib_dex_folder),
                            os.path.abspath(apk_folder),
                            os.path.abspath(output_folder),
                            processes)
 
 if __name__ == '__main__':
-    # print(sys.maxsize)
-    # # 溢出之前的结果日志
-    # if os.path.exists("log.txt"):
-    #     os.rename("log.txt")
-
     # 移除已经分析完成的apk
     # for file in os.listdir("outputs"):
     #     apk = file[:file.rfind(".")]

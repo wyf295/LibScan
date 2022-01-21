@@ -2,38 +2,23 @@ import logging
 import multiprocessing
 
 # Operating parameters related config
-# 定义运行的线程数
-import sys
+# 设置全局最大并行线程数
+max_thread_num = multiprocessing.cpu_count() - 8
 
-max_thread_num = multiprocessing.cpu_count() - 4
-
-# 影响较大的参数：
-# 当方法内opcode数量或者方法执行路径opcode数量大于该值时，不考虑（关键）
-# max_opcode_len = sys.maxsize # 可调（基本确定）700
-
-# 每opcode_error阈值位，允许有1位误差，低于该值，不允许有误差，该值越大，匹配要求的越严格
-# opcode_error = sys.maxsize # 关键 25
-
-#  apk方法中opcode数量不一定大于对应的库方法中的opcode数量，手动分析发现的
-# apk_lib_method_opcode_rate = 0.8 # 未使用
+# 设置库级别检测"lib"或库版本级别检测"lib_version"（默认库版本级别，需要提供库与真实包名映射文件obf_tpl_pkg.csv）
+detect_type = "lib_version"
 
 # 在进行类粗粒度匹配时，app类中匹配方法的权重之和比上该类权重大于阈值class_similar，则视为类匹配
-class_similar = 0.9 # 很关键（基本确定）
-# lib_similar = 0.8
+class_similar = 0.7 # 很关键（基本确定）
+# 设置库相似度，当库细粒度匹配的opcode数量与库总opcode数量比值大于该阈值，则视为包含，同时对于同一类库的不同版本，将该比值最大的视为真实包含的版本
+lib_similar = 0.85
 
-# 影响不大的参数：(对于无需修改的，后续直接在程序中定义，无需抽取成可配置参数）
-# 如果大的类opcode数量是小的类opcode数量的opcode_mutiple倍，则直接不匹配，这就避免了一些仅包含小方法的apk类与很大的lib类完成了粗粒度匹配（关键）
-# 可以自适应，当小类包含的opcode数量越多时
-# opcode_mutiple = 2 # 一般不调
+# 粗粒度极小匹配，无需进行细粒度匹配即可视为不包含该库，因为粗粒度匹配会为库中的每个类找出多个粗粒度匹配的应用程序类，
+# 而细粒度匹配是从这多个粗粒度匹配的应用程序类中找出真实匹配的一个类，最终再根据成功被细粒度匹配的库类情况来决定应用程序是否包含库
+# 所以库粗粒度匹配相似度值只会大于等于细粒度匹配相似度值
+# min_match = lib_similar
 
-# 粗粒度极小匹配，无需进行细粒度匹配即可视为不包含该库
-min_match = 0.1 # 可调
-
-# 为接口或抽象类中没有方法体的方法赋予权重值参与得分计算
-# abstract_method_weight = 3 # 一般不调
-
-
-# Log related config
+# 全局日志配置
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - [%(lineno)d] - %(message)s',
                     filename="log.txt",

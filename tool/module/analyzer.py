@@ -8,8 +8,7 @@ import sys
 import networkx as nx
 import math
 
-from config import (LOGGER, class_similar,
-                    min_match, max_thread_num)
+from config import (LOGGER, detect_type, class_similar, lib_similar, max_thread_num)
 from lib import ThirdLib
 from apk import Apk
 from util import split_list_n_list,deal_opcode_deq
@@ -31,6 +30,9 @@ def get_methods_jar_map():
 #根据obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名(如果映射文件中未定义，则直接返回库原始版本名作为库的真实名称，如：batik-dom-1.9.1）
 def get_lib_name(lib):
     lib_name_version = lib[:lib.rfind("-")]
+
+    if detect_type == "lib":
+        return lib_name_version
 
     import csv
     csv_reader = csv.reader(open("conf/obf_tpl_pkg.csv",encoding="utf-8"))
@@ -59,6 +61,31 @@ def get_opcode_coding(path):
 
     return opcode_dict
 
+# 实现子进程构建方法所属库映射文件
+def sub_method_map_decompile(lib_folder,
+                             libs,
+                             global_lib_info_dict,
+                             shared_lock_lib_info):
+    for lib in libs:
+        lib_obj = ThirdLib(lib_folder + "/" + lib)
+
+        # 记录库反编译信息对象
+        shared_lock_lib_info.acquire()
+        global_lib_info_dict[lib] = lib_obj
+        shared_lock_lib_info.release()
+
+        # 写入当前分析的所有库中的方法名与所属库到methods_jar.txt中，用于后续调用依赖库方法信息获取
+        LOGGER.debug("写入方法所属库信息...")
+        shared_lock_lib_info.acquire()
+        with open("conf/methodes_jar.txt", "a+", encoding="utf-8") as file:
+            for class_info_list in lib_obj.classes_dict.values():
+                if len(class_info_list) == 5:
+                    class_method_info_dict = class_info_list[4]
+                    for method_name in class_method_info_dict:
+                        file.write(method_name + ":" + lib + "\n")
+        shared_lock_lib_info.release()
+
+
 # 实现子进程提前反编译所有单个库
 def sub_decompile_lib(lib_folder,
                       libs,
@@ -73,12 +100,15 @@ def sub_decompile_lib(lib_folder,
 
     for lib in libs:
         lib_name = get_lib_name(lib)
-        lib_obj = ThirdLib(lib_folder + "/" + lib)
+        if lib not in global_lib_info_dict:
+            lib_obj = ThirdLib(lib_folder + "/" + lib)
 
-        # 记录库反编译信息
-        shared_lock_lib_info.acquire()
-        global_lib_info_dict[lib] = lib_obj
-        shared_lock_lib_info.release()
+            # 记录库反编译信息对象
+            shared_lock_lib_info.acquire()
+            global_lib_info_dict[lib] = lib_obj
+            shared_lock_lib_info.release()
+        else:
+            lib_obj = global_lib_info_dict[lib]
 
         if len(loop_dependence_libs) > 0:
             continue
@@ -104,6 +134,8 @@ def sub_decompile_lib(lib_folder,
             if dependence_relation not in global_dependence_relation:
                 global_dependence_relation.append(dependence_relation)
             shared_lock_dependence_info.release()
+
+
 
 # 反编译lib，得到粗粒度的类信息字典，键为类名，值为类中所有方法opcode序列的hash值排序组合字符串
 # 注：将库的方法中opcode个数小于3的方法排除
@@ -132,35 +164,31 @@ def get_lib_info(lib,
         if invoke_method not in methodes_jar:
             continue
 
-        invoke_lib_jar = methodes_jar[invoke_method]
-        # 特殊处理：对于当前的日志库，一定会存在slfj与logback的循环依赖，所以为了加快速度，直接忽略对日志库的依赖引入（可改进！）
-        # if invoke_lib_jar.startswith("slf4j") or invoke_lib_jar.startswith("logback"):
-        #     continue
+        invoke_lib_name = get_lib_name(methodes_jar[invoke_method])
 
-        lib_name_key = get_lib_name(invoke_lib_jar)
         # 如果调用库属于循环依赖库，则不考虑
-        if lib_name_key in loop_dependence_libs or lib_name_key == lib_name:
+        if invoke_lib_name in loop_dependence_libs or invoke_lib_name == lib_name:
             continue
 
-        if lib_name_key not in cur_libs and lib_name_key not in dependence_libs:
+        if invoke_lib_name not in cur_libs and invoke_lib_name not in dependence_libs:
             # 得到调用库的唯一标识名
             shared_lock_libs.acquire()
-            if lib_name_key in global_jar_dict or lib_name_key in global_running_jar_list:  # 说明依赖库尚未分析或者正在分析中
+            if invoke_lib_name in global_jar_dict or invoke_lib_name in global_running_jar_list:  # 说明依赖库尚未分析或者正在分析中
                 # print("存在未完成的依赖：", lib_name_key)
                 # 记录下库依赖关系
                 shared_lock_libs.release()
                 return None
-            elif lib_name_key in global_finished_jar_dict and lib_name_key not in cur_libs:  # 说明依赖库已经分析了，同时有检测结果，则需加入结果
+            elif invoke_lib_name in global_finished_jar_dict and invoke_lib_name not in cur_libs:  # 说明依赖库已经分析了，同时有检测结果，则需加入结果
                 shared_lock_libs.release()
-                dependence_libs.add(lib_name_key)
+                dependence_libs.add(invoke_lib_name)
             else:  # 说明依赖库已经分析了，但是不存在于当前apk中，所以无需引入该依赖库
                 shared_lock_libs.release()
-                cur_libs.add(lib_name_key)
+                cur_libs.add(invoke_lib_name)
 
     # 到此说明当前库依赖的库都已经分析完成了，需要引入的依赖库存在于dependence_libs集合中，依次加入所有依赖库即可即可
     for lib_name_key in dependence_libs:
         result = []
-        invoke_lib = global_finished_jar_dict[lib_name_key].split(" and ")[0]
+        invoke_lib = global_finished_jar_dict[lib_name_key][0].split(" and ")[0]
 
         invoke_lib_obj = None
         if os.path.exists("../libs_dex/" + invoke_lib):
@@ -221,7 +249,9 @@ def pre_match(apk_obj, lib_obj):
 
         satisfy_classes = deal_bloom_filter(lib_class_name, lib_classes_dict, app_filter)
 
-        filter_result[lib_class_name] = satisfy_classes
+        if len(satisfy_classes) > 0:
+            filter_result[lib_class_name] = satisfy_classes
+
         lib_filter_set_sum += len(satisfy_classes)
 
         if len(satisfy_classes) == 0:
@@ -266,6 +296,9 @@ def coarse_match(apk_obj, lib_obj, filter_result, opcode_dict):
     apk_classes_dict = apk_obj.classes_dict
 
     for lib_class in lib_classes_dict:
+
+        if lib_class not in filter_result:
+            continue
 
         class_match_dict = {}
 
@@ -453,7 +486,8 @@ def fine_match(apk_obj, lib_obj, lib_class_match_dict, opcode_dict):
                 if match(apk_method_opcodes, lib_method_opcodes, opcode_dict):
                     # 将当前完成细粒度匹配的lib方法opcode数量加上
                     cur_match_class_opcodes += lib_classes_dict[lib_class][4][lib_method][2]
-                    cur_class_diff_opcodes += math.fabs((apk_classes_dict[apk_class][3][apk_method][2] - lib_classes_dict[lib_class][4][lib_method][2]))
+                    cur_class_diff_opcodes += math.fabs((apk_classes_dict[apk_class][3][apk_method][2] -
+                                                         lib_classes_dict[lib_class][4][lib_method][2]))
                     match_method_num += 1
 
             if (cur_match_class_opcodes > max_match_class_opcodes) or \
@@ -483,6 +517,10 @@ def detect(apk_obj, lib_obj):
     if len(lib_obj.classes_dict) == 0:
         return {}
 
+    # 获取库对象中的信息
+    lib_opcode_num = lib_obj.lib_opcode_num
+    lib_classes_dict = lib_obj.classes_dict
+
     # 读取opcode及编号，用于后面进行方法匹配
     opcode_dict = get_opcode_coding("conf/opcodes_encoding.txt")
 
@@ -496,11 +534,24 @@ def detect(apk_obj, lib_obj):
 
     # 通过过滤器为库中的每个类找出app中的潜在匹配类集合
     filter_result = pre_match(apk_obj,lib_obj)
+    pre_match_opcodes = 0
     for lib_class in filter_result:
+        # 记录存在预匹配应用程序类的库类opcode数量之和
+        if len(lib_classes_dict[lib_class]) == 2: # 说明是接口或抽象类
+            pre_match_opcodes += (lib_classes_dict[lib_class][0] * abstract_method_weight)
+        else:
+            pre_match_opcodes += lib_classes_dict[lib_class][2]
         LOGGER.debug("预匹配lib_class: %s", lib_class)
         for apk_class in filter_result[lib_class]:
             LOGGER.debug("apk_class: %s", apk_class)
         LOGGER.debug("-------------------------------")
+
+    # 根据预匹配结果判断是否不包含
+    pre_match_rate = pre_match_opcodes / lib_opcode_num
+    if pre_match_rate < lib_similar:
+        LOGGER.debug("预匹配失败库：%s，预匹配率为：%f", lib_obj.lib_name, pre_match_rate)
+        return {}
+
 
     # avg_filter_rate += filter_rate
     # LOGGER.debug("filter_rate: %f", filter_rate)
@@ -517,16 +568,16 @@ def detect(apk_obj, lib_obj):
             LOGGER.debug("apk_class: %s", apk_class)
         LOGGER.debug("-------------------------------")
 
-    # 获取库对象中的信息
-    lib_opcode_num = lib_obj.lib_opcode_num
-    lib_classes_dict = lib_obj.classes_dict
+    # 计算库中抽象类或接口的匹配得分
+    abstract_match_opcodes = 0
+    for abstract_class in abstract_lib_match_classes:
+        abstract_match_opcodes += (lib_classes_dict[abstract_class][0] * abstract_method_weight)
 
     # 计算lib粗粒度匹配得分
     lib_coarse_match_opcode_num = 0
     for lib_class in lib_match_classes:
         lib_coarse_match_opcode_num += lib_classes_dict[lib_class][2]
-    for abstract_class in abstract_lib_match_classes:
-        lib_coarse_match_opcode_num += (lib_classes_dict[abstract_class][0] * abstract_method_weight)
+    lib_coarse_match_opcode_num +=abstract_match_opcodes
 
     lib_coarse_match_rate = lib_coarse_match_opcode_num / lib_opcode_num
     LOGGER.debug("lib粗粒度匹配的类中所有opcode数量：%d", lib_coarse_match_opcode_num)
@@ -534,8 +585,9 @@ def detect(apk_obj, lib_obj):
     LOGGER.debug("库中匹配的类数：%d", len(lib_match_classes) + len(abstract_lib_match_classes))
     LOGGER.debug("库中所有参与匹配的类数：%d", len(lib_classes_dict))
 
-    if lib_coarse_match_rate < min_match:  # 当粗粒度匹配得分极小时，直接不包含，无需进行细粒度匹配
-        LOGGER.debug("极小匹配库：%s，粗粒度匹配率为：%f", lib_obj.lib_name, lib_coarse_match_rate)
+    # 根据粗粒度匹配结果判断是否不包含
+    if lib_coarse_match_rate < lib_similar:
+        LOGGER.debug("粗粒度匹配失败库：%s，粗粒度匹配率为：%f", lib_obj.lib_name, lib_coarse_match_rate)
         return {}
 
     # 进行细粒度匹配
@@ -555,18 +607,17 @@ def detect(apk_obj, lib_obj):
     final_match_opcodes = 0
     for lib_class in lib_class_match_result:
         final_match_opcodes += lib_class_match_result[lib_class][1]
+    final_match_opcodes += abstract_match_opcodes
 
-    # 考虑接口与抽象类匹配结果
-    for lib_class in abstract_lib_match_classes:
-        final_match_opcodes += (lib_classes_dict[lib_class][0] * abstract_method_weight)
+    # 根据待检测的库是否为纯接口库来调整库相似度阈值
+    min_lib_match = lib_similar
+    if lib_obj.interface_lib:
+        min_lib_match = 1.0
 
-    # 设置阈值自适应（可改进：寻找合适的函数来代替手动自适应）
-    min_lib_match3 = 0.1
-    # if lib_opcode_num < 100:
-    #     min_lib_match3 = 0.7
-
+    # print("当前库为：", lib_obj.lib_name)
+    # print("min_lib_match: ", min_lib_match)
     temp_list = [final_match_opcodes, lib_opcode_num, final_match_opcodes / lib_opcode_num]
-    if final_match_opcodes / lib_opcode_num > min_lib_match3:
+    if final_match_opcodes / lib_opcode_num >= min_lib_match:
         LOGGER.debug("包含")
         result[lib_obj.lib_name] = temp_list
 
@@ -595,10 +646,6 @@ def detect_lib(libs_name,
         lib_obj = get_lib_info(lib, methodes_jar, cur_libs, global_jar_dict,
                                global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
                                global_lib_info_dict, loop_dependence_libs)
-        # 不检测纯接口类
-        # if len(result_list) >= 7 and not result_list[6]:
-        #     # Logger.error("不检测纯接口库：%s", lib)
-        #     continue
 
         if lib_obj == None:
             LOGGER.debug("存在尚未分析完成的依赖库！")
@@ -612,19 +659,22 @@ def detect_lib(libs_name,
 
     return result, flag
 
-# 只将库操作码数量占比最大的视为真实库版本
+# 将库操作码数量占比最大的视为真实库版本
 def get_lib_version(result_dict):
     max_lib = ""
     opcode_rate = 0
 
     for lib in result_dict:
+        lib_name = lib[:lib.rfind("-")]
         if result_dict[lib][2] > opcode_rate:
-            max_lib = lib
+            max_lib = lib_name
             opcode_rate = result_dict[lib][2]
         elif result_dict[lib][2] == opcode_rate:
-            max_lib += (" and " + lib)
+            max_lib += (" and " + lib_name)
 
-    return max_lib
+    final_lib = max_lib
+
+    return [final_lib,opcode_rate]
 
 # 实现子进程检测
 def sub_detect_lib(process_name,
@@ -670,10 +720,10 @@ def sub_detect_lib(process_name,
                 global_libs_info_dict[lib] = result[lib]
             shared_lock_libs_info.release()
 
-            lib_version = get_lib_version(result)
+            lib_version_info = get_lib_version(result)
             # 键库检测结果版本写入global_finished_jar_dict
             shared_lock_libs.acquire()
-            global_finished_jar_dict[first_key] = lib_version
+            global_finished_jar_dict[first_key] = lib_version_info
             global_running_jar_list.remove(first_key)
             shared_lock_libs.release()
         else:  # 说明库被检测到不存在
@@ -698,7 +748,6 @@ def search_libs_in_app(lib_dex_folder = None,
                       apk_folder = None,
                       output_folder = 'outputs',
                       processes = None):
-    methodes_jar = get_methods_jar_map()
 
     # 设置分析的cpu数量上限
     thread_num = processes if processes != None else max_thread_num
@@ -724,15 +773,45 @@ def search_libs_in_app(lib_dex_folder = None,
     # 定义循环依赖库列表共享锁
     shared_lock_loop_libs = multiprocessing.Manager().Lock()
 
-    # 定义多进程将所有待检测的库全部反编译，并将node_dict保存到全局内存
-    processes_list_decompile = []
     decompile_thread_num = thread_num if thread_num <= len(libs) else len(libs)
+    # 构建方法与所属库映射文件，用于后续找出依赖库
+    if not os.path.exists("conf/methodes_jar.txt"):
+        processes_list_method_maps = []
+
+        for sub_libs in split_list_n_list(libs, decompile_thread_num):
+            thread = multiprocessing.Process(target=sub_method_map_decompile,
+                                             args=(lib_dex_folder,
+                                                   sub_libs,
+                                                   global_lib_info_dict,
+                                                   shared_lock_lib_info))
+
+            processes_list_method_maps.append(thread)
+
+        # 开启所有反编译子进程
+        for thread in processes_list_method_maps:
+            thread.start()
+
+        # 等待所有反编译子进程运行结束
+        for thread in processes_list_method_maps:
+            thread.join()
+
+        print("方法所属库映射文件构建完成...")
+
+    # 定义多进程将所有待检测的库全部反编译，并提取库反编译得到的各类信息
+    methodes_jar = get_methods_jar_map()
+    processes_list_decompile = []
     for sub_libs in split_list_n_list(libs, decompile_thread_num):
         thread = multiprocessing.Process(target=sub_decompile_lib,
-                                         args=(lib_dex_folder, sub_libs, global_lib_info_dict,
-                                               shared_lock_lib_info, methodes_jar,
-                                               global_dependence_relation, global_dependence_libs,
-                                               shared_lock_dependence_info, loop_dependence_libs))
+                                         args=(lib_dex_folder,
+                                               sub_libs,
+                                               global_lib_info_dict,
+                                               shared_lock_lib_info,
+                                               methodes_jar,
+                                               global_dependence_relation,
+                                               global_dependence_libs,
+                                               shared_lock_dependence_info,
+                                               loop_dependence_libs))
+
         processes_list_decompile.append(thread)
 
     # 开启所有反编译子进程
@@ -753,8 +832,11 @@ def search_libs_in_app(lib_dex_folder = None,
         processes_list_libs_dependence = []
         for sub_libs in split_list_n_list(global_dependence_libs, dependence_deal_thread_num):
             thread = multiprocessing.Process(target=sub_find_loop_dependence_libs,
-                                             args=(sub_libs, global_dependence_relation, loop_dependence_libs,
+                                             args=(sub_libs,
+                                                   global_dependence_relation,
+                                                   loop_dependence_libs,
                                                    shared_lock_loop_libs))
+
             processes_list_libs_dependence.append(thread)
 
         # 开启所有反编译子进程
@@ -849,16 +931,16 @@ def search_libs_in_app(lib_dex_folder = None,
             LOGGER.info("%s  :  %f   %f   %f", lib, global_libs_info_dict[lib][0],
                          global_libs_info_dict[lib][1], global_libs_info_dict[lib][2])
         LOGGER.info("-------------------------------------------------------------------")
-        LOGGER.info("检测出库的总数：%d", len(global_finished_jar_dict))
-        LOGGER.info("最终检测结果如下：")
-        with open(output_folder + "/" + apk + ".txt", "w", encoding="utf-8") as result:
-            for v in sorted(global_finished_jar_dict.values()):
-                LOGGER.info(v)
-                result.write(v + "\n")
-
         # 输出apk分析时长
         apk_time_end = datetime.datetime.now()
-        LOGGER.info("当前apk分析时长：%d（单位秒）", (apk_time_end - apk_time_start).seconds)
+        apk_time = (apk_time_end - apk_time_start).seconds
+        with open(output_folder + "/" + apk + ".txt", "w", encoding="utf-8") as result:
+            for lib in sorted(global_finished_jar_dict.keys()):
+                result.write("lib: " + global_finished_jar_dict[lib][0] + "\n")
+                result.write("similarity: " + str(global_finished_jar_dict[lib][1]) + "\n\n")
+            result.write("time: " + str(apk_time) + "s")
+
+        LOGGER.info("当前apk分析时长：%d（单位秒）", apk_time)
 
 def sub_detect_apk(process_name,
                    lib_obj,
@@ -956,7 +1038,7 @@ def search_lib_in_app(lib_dex_folder = None,
     # 日志中输入检测结果
     # 将所有检测结果写入文件
     # print("global_result_dict: ", global_result_dict)
-    with open(output_folder + "/result.txt", "w", encoding="utf-8") as result:
+    with open(output_folder + "/results.txt", "w", encoding="utf-8") as result:
         result.write("apk名称     库名称     相似度得分\n")
         for k in sorted(global_result_dict.keys()):
             result.write(k + "   " + lib_obj.lib_name + "   " + global_result_dict[k] + '\n')

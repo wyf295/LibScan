@@ -29,11 +29,10 @@ class ThirdLib(object):
         # 后续用于匹配的库信息
         self.lib_opcode_num = int()  # 库中的opcode数量之和
         self.classes_dict = dict() # 记录库中的所有类信息
-        # self.lib_filter = dict() # 库过滤器，记录库类中包含的一些特征信息
         self.nodes_dict = dict()  # 记录方法内的每一个节点信息
         self.lib_method_num = int() # 记录库中所有方法数量
-        self.ground_class_flag = False  # 记录库中是否有非抽象类或接口的类，默认无
         self.invoke_other_methodes = set() # 记录库中调用的所有方法
+        self.interface_lib = True # 记录当前库是否为纯接口库
 
         # 初始化ThirdLib对象时，解析lib对应的dex1文件
         LOGGER.debug("开始解析 %s ...", os.path.basename(lib_path))
@@ -290,10 +289,10 @@ class ThirdLib(object):
                 self.lib_opcode_num += (len(cls.get_methods()) * abstract_method_weight)
                 continue
 
-            self.ground_class_flag = True
-
             if len(class_method_info_dict) == 0:
                 continue
+
+            self.interface_lib = False
 
             self.lib_opcode_num += class_opcode_num
 
