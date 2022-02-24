@@ -4,11 +4,10 @@
 import csv
 import os
 import datetime
-import config
 import hashlib
 
 from config import LOGGER
-from util import valid_method_name,deal_opcode_deq
+from util import valid_method_name,deal_opcode_deq,toMillisecond
 
 from androguard.core.bytecodes.apk import APK
 from androguard.core.bytecodes.dvm import DalvikVMFormat
@@ -42,17 +41,19 @@ class Apk(object):
         try:
             apk_obj = APK(apk_path)
         except Exception:
-            return 0, 0
+            return
         time_end = datetime.datetime.now()
-        decompile_time = time_end - time_start
-        LOGGER.debug("反编译完成，用时：%d", decompile_time.seconds)
+        # decompile_time = time_end - time_start
+        LOGGER.debug("apk反编译完成，用时：%d ms", toMillisecond(time_start, time_end))
 
         # 提取apk信息
         time_start = datetime.datetime.now()
         for dex in apk_obj.get_all_dex():
-
-            dex_obj = DalvikVMFormat(dex)
-            analysis_obj = Analysis(dex_obj)
+            try:
+                dex_obj = DalvikVMFormat(dex)
+                analysis_obj = Analysis(dex_obj)
+            except Exception:
+                return
 
             for cls in dex_obj.get_classes():
                 class_name = cls.get_name().replace("/", ".")[1:-1]
@@ -303,8 +304,8 @@ class Apk(object):
                 self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
 
         time_end = datetime.datetime.now()
-        extract_info_time = time_end - time_start
-        LOGGER.debug("解析apk完成，用时：%d", extract_info_time.seconds)
+        # extract_info_time = time_end - time_start
+        LOGGER.debug("解析apk完成，用时：%d ms", toMillisecond(time_start, time_end))
 
     # 获取每个方法的opcode序列字符串
     def _get_method_info(self, bytecode_buff, inter_method_name):

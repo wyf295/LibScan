@@ -146,11 +146,7 @@ def main(lib_folder = None,
                            processes)
 
 if __name__ == '__main__':
-    # 移除已经分析完成的apk
-    # for file in os.listdir("outputs"):
-    #     apk = file[:file.rfind(".")]
-    #     if os.path.exists("apks/" + apk):
-    #         os.remove("apks/" + apk)
+
 
     args = parse_arguments()
     LOGGER.setLevel(args.v)
@@ -158,6 +154,13 @@ if __name__ == '__main__':
     LOGGER.debug("args: %s", args)
 
     start_time = datetime.datetime.now()
+
+    # 移除已经分析完成的apk，F:/download_apks/apks_2017_10000
+    # apks_folder = args.af
+    # for file in os.listdir("outputs"):
+    #     apk = file[:file.rfind(".")]
+    #     if os.path.exists(apks_folder + "/" + apk):
+    #         os.remove(apks_folder + "/" + apk)
 
     if args.subparser_name == 'detect_one':
         main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p, model="one")

@@ -30,6 +30,10 @@ def deal_opcode_deq(opcode_seq):
         new_seq = new_seq + seq + " "
     return new_seq[:-1]
 
+# 将时间转换为毫秒
+def toMillisecond(start_time, end_time):
+    return (end_time -start_time).seconds * 1000 + (end_time -start_time).microseconds / 1000
+
 
 
 

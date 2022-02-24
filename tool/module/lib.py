@@ -42,7 +42,13 @@ class ThirdLib(object):
     # 读取obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名
     def _parse_lib(self, lib_path):
         time_start = datetime.datetime.now()
-        dex_obj = DalvikVMFormat(read(lib_path))
+        try:
+            dex_obj = DalvikVMFormat(read(lib_path))
+        except ValueError as e:
+            print("lib_path: ", lib_path)
+            print(e)
+            os.remove(lib_path)
+            return
         analysis_obj = Analysis(dex_obj)
         time_end = datetime.datetime.now()
         decompile_time = time_end - time_start

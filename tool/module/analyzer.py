@@ -563,9 +563,12 @@ def detect(apk_obj, lib_obj):
                                                                                        filter_result,
                                                                                        opcode_dict)
     for lib_class in lib_class_match_dict:
-        LOGGER.debug("粗粒度匹配lib_class: %s", lib_class)
-        for apk_class in lib_class_match_dict[lib_class]:
-            LOGGER.debug("apk_class: %s", apk_class)
+        if len(lib_class_match_dict[lib_class]) > 1:
+            LOGGER.debug("粗粒度匹配lib_class: %s", lib_class)
+            for apk_class in lib_class_match_dict[lib_class]:
+                LOGGER.debug("apk_class: %s", apk_class)
+                for lib_method in lib_class_match_dict[lib_class][apk_class]:
+                    LOGGER.debug("库类函数%s → 应用程序类函数%s",lib_method,lib_class_match_dict[lib_class][apk_class][lib_method])
         LOGGER.debug("-------------------------------")
 
     # 计算库中抽象类或接口的匹配得分
@@ -646,7 +649,6 @@ def detect_lib(libs_name,
         lib_obj = get_lib_info(lib, methodes_jar, cur_libs, global_jar_dict,
                                global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
                                global_lib_info_dict, loop_dependence_libs)
-
         if lib_obj == None:
             LOGGER.debug("存在尚未分析完成的依赖库！")
             # print("存在依赖！")
@@ -748,6 +750,9 @@ def search_libs_in_app(lib_dex_folder = None,
                       apk_folder = None,
                       output_folder = 'outputs',
                       processes = None):
+    # 获取分析完成的apk集合
+    finish_apks = [apk[:apk.rfind(".")] for apk in os.listdir(output_folder)]
+    print("分析完成的apk数量：", len(finish_apks))
 
     # 设置分析的cpu数量上限
     thread_num = processes if processes != None else max_thread_num
@@ -853,6 +858,10 @@ def search_libs_in_app(lib_dex_folder = None,
     LOGGER.debug("所有库信息提取完成, 用时：%d", (time_end - time_start).seconds)
 
     for apk in os.listdir(apk_folder):
+
+        if apk in finish_apks:
+            continue
+
         print("开始分析：", apk)
         LOGGER.info("开始分析：%s", apk)
         apk_time_start = datetime.datetime.now()
