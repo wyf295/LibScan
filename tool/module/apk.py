@@ -1,7 +1,4 @@
-# 文件描述信息
-
-
-import csv
+# 构建apk对象
 import os
 import datetime
 import hashlib
@@ -43,7 +40,6 @@ class Apk(object):
         except Exception:
             return
         time_end = datetime.datetime.now()
-        # decompile_time = time_end - time_start
         LOGGER.debug("apk反编译完成，用时：%d ms", toMillisecond(time_start, time_end))
 
         # 提取apk信息
@@ -304,7 +300,6 @@ class Apk(object):
                 self.classes_dict[cls.get_name().replace("/", ".")[1:-1]] = class_info_list
 
         time_end = datetime.datetime.now()
-        # extract_info_time = time_end - time_start
         LOGGER.debug("解析apk完成，用时：%d ms", toMillisecond(time_start, time_end))
 
     # 获取每个方法的opcode序列字符串
@@ -348,7 +343,6 @@ class Apk(object):
                     num += 1
                     node_opcode_seq = ""
 
-        # if node_opcode_seq != "": 可能存在一些opcode为空的方法，也要记录
         node_info = [node_opcode_seq[:-1], ""]
         self.nodes_dict[inter_method_name + "_" + str(num)] = node_info
 

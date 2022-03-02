@@ -1,6 +1,4 @@
-# 文件描述信息
-
-
+# 构建库对象
 import csv
 import os
 import datetime
@@ -406,17 +404,5 @@ class ThirdLib(object):
         if count > filter_record_limit:
             count = filter_record_limit
         class_filter[index] = count
-
-    # 将lib中的类名添加到布隆过滤器中合适位置里的集合中
-    # def _add_filter(self, class_name, index, num):
-    #     contain_list = self.lib_filter.get(index, [set() for i in range(filter_record_limit)])
-    #     set_index = int(num) - 1
-    #     if set_index > filter_record_limit:
-    #         set_index = filter_record_limit
-    #     class_set = contain_list.pop(set_index)
-    #     class_set.add(class_name)
-    #     contain_list.insert(set_index, class_set)
-    #     self.lib_filter[index] = contain_list
-
 
 

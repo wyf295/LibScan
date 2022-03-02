@@ -135,8 +135,6 @@ def sub_decompile_lib(lib_folder,
                 global_dependence_relation.append(dependence_relation)
             shared_lock_dependence_info.release()
 
-
-
 # 反编译lib，得到粗粒度的类信息字典，键为类名，值为类中所有方法opcode序列的hash值排序组合字符串
 # 注：将库的方法中opcode个数小于3的方法排除
 def get_lib_info(lib,
@@ -154,7 +152,9 @@ def get_lib_info(lib,
     # 记录当前已经加入内容的依赖库
     cur_libs.add(lib_name)
 
+    shared_lock_libs.acquire()
     lib_obj = global_lib_info_dict[lib]
+    shared_lock_libs.release()
     nodes_dict = lib_obj.nodes_dict
     invoke_other_methodes = lib_obj.invoke_other_methodes
 
@@ -235,7 +235,6 @@ def deal_bloom_filter(lib_class_name, lib_classes_dict, app_filter):
 
     return satisfy_classes
 
-
 # 处理得到apk所有类中每个类的过滤结果集，记录在filter_result字典中，并统计过滤效果信息
 def pre_match(apk_obj, lib_obj):
     succ_filter_num = 0
@@ -265,10 +264,8 @@ def pre_match(apk_obj, lib_obj):
     # return filter_result, filter_rate, filter_effect
     return filter_result
 
-# 采用过滤器的方式，计算是否包含，不再返回相似度，直接返回true或false（可改进：目前只考虑opcode是否出现，可以考虑加上opcode数量）
 # 采用包含的方式来判断匹配，是为了抵御控制流随机化，插入无效代码、部分代码位置随机化等
 def match(apk_method_opcode_list, lib_method_opcode_list, opcode_dict):
-
     # 通过过滤器的方式检测apk方法与lib方法是否匹配(库中方法的opcode必须存在于apk方法中）
     # 先使用apk方法设置过滤器的每一位
     method_bloom_filter = {}
@@ -392,7 +389,6 @@ def coarse_match(apk_obj, lib_obj, filter_result, opcode_dict):
 
     return lib_match_classes, abstract_lib_match_classes, lib_class_match_dict
 
-
 # 递归的获取当前方法的完整opcode执行序列，算法：在二叉树上的中、右、左遍历（为了避免循环调用对当前方法的影响，删除会循环调用边）
 # 注意：并不是调用路径中一个方法只能出现一次，只要不会出现循环调用，可以多次调用同一个方法，比如某个tool方法，设置route_node_list来记录。
 def get_method_action(node, node_dict, method_action_dict, route_method_set, invoke_length):
@@ -434,7 +430,7 @@ def get_method_action(node, node_dict, method_action_dict, route_method_set, inv
 
     return cur_action_seq
 
-# 实现获取指定方法列表中每个方法的完整opcode执行序列，目前采用单线程设计（可改进）
+# 实现获取指定方法列表中每个方法的完整opcode执行序列
 def get_methods_action(method_list, node_dict):
     method_action_dict = {}
 
@@ -451,7 +447,7 @@ def fine_match(apk_obj, lib_obj, lib_class_match_dict, opcode_dict):
     apk_classes_dict = apk_obj.classes_dict
     lib_classes_dict = lib_obj.classes_dict
     # 根据粗粒度匹配结果进行细粒度匹配
-    # 1、获取所有需要比较的方法opcode执行序列，并记录到自定methods_action = {method_name: opcode_seq}（可改进：多线程获取）
+    # 1、获取所有需要比较的方法opcode执行序列，并记录到自定methods_action = {method_name: opcode_seq}
     apk_pre_methods = set()
     lib_pre_methods = set()
     for lib_class in lib_class_match_dict:

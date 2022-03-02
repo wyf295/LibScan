@@ -1,12 +1,9 @@
 # 程序启动入口
-
 import os
 import argparse
 import datetime
 import zipfile
-import sys
 
-from shutil import move
 from module.config import LOGGER
 from module.analyzer import search_lib_in_app,search_libs_in_app
 
@@ -128,11 +125,10 @@ def main(lib_folder = None,
          output_folder = 'outputs',
          processes = None,
          model = None):
-    # 目前假设一定传入检测的库目录
-
     # 将库目录下所有的arr、jar文件转化为dex文件，并放入libs_dex目录下
-    # arr_to_jar(lib_folder)
-    # jar_to_dex(lib_folder, lib_dex_folder)
+    if len(os.listdir(lib_dex_folder)) == 0:
+        arr_to_jar(lib_folder)
+        jar_to_dex(lib_folder, lib_dex_folder)
 
     if model == "multiple": # 在库级别并行分析
         search_libs_in_app(os.path.abspath(lib_dex_folder),
@@ -146,21 +142,12 @@ def main(lib_folder = None,
                            processes)
 
 if __name__ == '__main__':
-
-
     args = parse_arguments()
     LOGGER.setLevel(args.v)
 
     LOGGER.debug("args: %s", args)
 
     start_time = datetime.datetime.now()
-
-    # 移除已经分析完成的apk，F:/download_apks/apks_2017_10000
-    # apks_folder = args.af
-    # for file in os.listdir("outputs"):
-    #     apk = file[:file.rfind(".")]
-    #     if os.path.exists(apks_folder + "/" + apk):
-    #         os.remove(apks_folder + "/" + apk)
 
     if args.subparser_name == 'detect_one':
         main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p, model="one")
