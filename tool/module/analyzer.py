@@ -29,7 +29,7 @@ def get_methods_jar_map():
 
 #根据obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名(如果映射文件中未定义，则直接返回库原始版本名作为库的真实名称，如：batik-dom-1.9.1）
 def get_lib_name(lib):
-    lib_name_version = lib[:lib.rfind("-")]
+    lib_name_version = lib[:lib.rfind(".")]
 
     if detect_type == "lib":
         return lib_name_version
@@ -663,7 +663,7 @@ def get_lib_version(result_dict):
     opcode_rate = 0
 
     for lib in result_dict:
-        lib_name = lib[:lib.rfind("-")]
+        lib_name = lib[:lib.rfind(".")]
         if result_dict[lib][2] > opcode_rate:
             max_lib = lib_name
             opcode_rate = result_dict[lib][2]
