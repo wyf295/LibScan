@@ -3,7 +3,8 @@ import os
 import argparse
 import datetime
 import zipfile
-
+import sys
+sys.path.append(os.getcwd() + "/module")
 from module.config import LOGGER
 from module.analyzer import search_lib_in_app,search_libs_in_app
 
