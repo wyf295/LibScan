@@ -14,7 +14,7 @@ def parse_arguments():
         help='sub-command help', dest='subparser_name')
 
     parser_one = subparsers.add_parser(
-        'detect_one', help='指定模式：检测多个apk中是否存在某一个第三方库具体版本（apk检测级并行）')
+        'detect_one', help='单检测模式：检测多个apk中是否存在某一个第三方库具体版本（apk检测级并行）')
     parser_one.add_argument(
         '-o',
         metavar='FOLDER',
@@ -27,13 +27,6 @@ def parse_arguments():
         type=int,
         default=None,
         help='设置所有并行工作阶段的最大线程数（默认为当前工作机器的CPU核心数）'
-    )
-    parser_one.add_argument(
-        '-v',
-        metavar='VERSION',
-        type=str,
-        default="INFO",
-        help='设置日志输出级别，可选INFO/DEBUG'
     )
     parser_one.add_argument(
         '-af',
@@ -55,7 +48,7 @@ def parse_arguments():
     )
 
     parser_specific = subparsers.add_parser(
-        'detect_all', help='指定模式：检测多个apk中是否存在多个第三方库具体版本（库检测级并行）')
+        'detect_all', help='多检测模式：检测多个apk中是否存在多个第三方库具体版本（库检测级并行）')
     parser_specific.add_argument(
         '-o',
         metavar='FOLDER',
@@ -68,13 +61,6 @@ def parse_arguments():
         type=int,
         default=None,
         help='设置所有并行工作阶段的最大线程数（默认为当前工作机器的CPU核心数）'
-    )
-    parser_specific.add_argument(
-        '-v',
-        metavar = 'VERSION',
-        type=str,
-        default="INFO",
-        help='设置日志输出级别，可选INFO/DEBUG'
     )
     parser_specific.add_argument(
         '-af',
@@ -119,12 +105,12 @@ def arr_to_jar(libs_folder):
             zip_file.close()
             os.remove(libs_folder+ "/" + file)
 
-def main(lib_folder = None,
-         lib_dex_folder = None,
-         apk_folder = None,
+def main(lib_folder = 'libs',
+         lib_dex_folder = 'libs_dex',
+         apk_folder = 'apks',
          output_folder = 'outputs',
          processes = None,
-         model = None):
+         model = 'multiple'):
     # 将库目录下所有的arr、jar文件转化为dex文件，并放入libs_dex目录下
     if len(os.listdir(lib_dex_folder)) == 0:
         arr_to_jar(lib_folder)
@@ -143,11 +129,8 @@ def main(lib_folder = None,
 
 if __name__ == '__main__':
     args = parse_arguments()
-    LOGGER.setLevel(args.v)
 
     LOGGER.debug("args: %s", args)
-
-    start_time = datetime.datetime.now()
 
     if args.subparser_name == 'detect_one':
         main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p, model="one")
@@ -155,6 +138,3 @@ if __name__ == '__main__':
         main(lib_folder = args.lf, lib_dex_folder = args.ld, apk_folder=args.af, output_folder= args.o, processes=args.p, model="multiple")
     else:
         LOGGER.debug("检测模式输入错误!")
-
-    end_time = datetime.datetime.now()
-    print("检测耗时：%d（单位秒）" % ((end_time - start_time).seconds))

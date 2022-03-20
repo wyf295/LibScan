@@ -11,10 +11,10 @@ import math
 from config import (LOGGER, detect_type, class_similar, lib_similar, max_thread_num)
 from lib import ThirdLib
 from apk import Apk
-from util import split_list_n_list,deal_opcode_deq
+from util import split_list_n_list, deal_opcode_deq
 
 # 为接口或抽象类中没有方法体的方法赋予权重值参与得分计算
-abstract_method_weight = 3 # 一般不调
+abstract_method_weight = 3  # 一般不调
 # 定义允许的最大递归深度
 sys.setrecursionlimit(5000)
 
@@ -27,7 +27,7 @@ def get_methods_jar_map():
 
     return methodes_jar
 
-#根据obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名(如果映射文件中未定义，则直接返回库原始版本名作为库的真实名称，如：batik-dom-1.9.1）
+# 根据obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名(如果映射文件中未定义，则直接返回库原始版本名作为库的真实名称，如：batik-dom-1.9.1）
 def get_lib_name(lib):
     lib_name_version = lib[:lib.rfind(".")]
 
@@ -35,7 +35,7 @@ def get_lib_name(lib):
         return lib_name_version
 
     import csv
-    csv_reader = csv.reader(open("conf/obf_tpl_pkg.csv",encoding="utf-8"))
+    csv_reader = csv.reader(open("conf/obf_tpl_pkg.csv", encoding="utf-8"))
     csv_reader = list(csv_reader)
 
     lib_name_dict = {}
@@ -46,7 +46,7 @@ def get_lib_name(lib):
         LOGGER.debug("没有在obf_tpl_pkg.csv文件中找到库对应的真实名称信息：%s", lib_name_version)
         return lib_name_version
 
-    return lib_name_dict[lib_name_version].replace("/",".")
+    return lib_name_dict[lib_name_version].replace("/", ".")
 
 # 获取每个opcode及对应编号(编号从1到232)
 def get_opcode_coding(path):
@@ -84,7 +84,6 @@ def sub_method_map_decompile(lib_folder,
                     for method_name in class_method_info_dict:
                         file.write(method_name + ":" + lib + "\n")
         shared_lock_lib_info.release()
-
 
 # 实现子进程提前反编译所有单个库
 def sub_decompile_lib(lib_folder,
@@ -138,14 +137,14 @@ def sub_decompile_lib(lib_folder,
 # 反编译lib，得到粗粒度的类信息字典，键为类名，值为类中所有方法opcode序列的hash值排序组合字符串
 # 注：将库的方法中opcode个数小于3的方法排除
 def get_lib_info(lib,
-                  methodes_jar,
-                  cur_libs,
-                  global_jar_dict,
-                  global_finished_jar_dict,
-                  global_running_jar_list,
-                  shared_lock_libs,
-                  global_lib_info_dict,
-                  loop_dependence_libs):
+                 methodes_jar,
+                 cur_libs,
+                 global_jar_dict,
+                 global_finished_jar_dict,
+                 global_running_jar_list,
+                 shared_lock_libs,
+                 global_lib_info_dict,
+                 loop_dependence_libs):
     if lib in cur_libs:
         return []
     lib_name = get_lib_name(lib)
@@ -193,8 +192,8 @@ def get_lib_info(lib,
         invoke_lib_obj = None
         if os.path.exists("../libs_dex/" + invoke_lib):
             invoke_lib_obj = get_lib_info(invoke_lib, methodes_jar, cur_libs, global_jar_dict,
-                                   global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
-                                   global_lib_info_dict, loop_dependence_libs)
+                                          global_finished_jar_dict, global_running_jar_list, shared_lock_libs,
+                                          global_lib_info_dict, loop_dependence_libs)
             if len(result) != 0:
                 LOGGER.debug("加入其他库内容：%s", invoke_lib)
         else:
@@ -548,7 +547,6 @@ def detect(apk_obj, lib_obj):
         LOGGER.debug("预匹配失败库：%s，预匹配率为：%f", lib_obj.lib_name, pre_match_rate)
         return {}
 
-
     # avg_filter_rate += filter_rate
     # LOGGER.debug("filter_rate: %f", filter_rate)
     # LOGGER.debug("filter_effect: %f", filter_effect)
@@ -676,16 +674,16 @@ def get_lib_version(result_dict):
 
 # 实现子进程检测
 def sub_detect_lib(process_name,
-               global_jar_dict,
-               global_finished_jar_dict,
-               global_running_jar_list,
-               shared_lock_libs,
-               global_libs_info_dict,
-               shared_lock_libs_info,
-               apk_obj,
-               methodes_jar,
-               global_lib_info_dict,
-               loop_dependence_libs):
+                   global_jar_dict,
+                   global_finished_jar_dict,
+                   global_running_jar_list,
+                   shared_lock_libs,
+                   global_libs_info_dict,
+                   shared_lock_libs_info,
+                   apk_obj,
+                   methodes_jar,
+                   global_lib_info_dict,
+                   loop_dependence_libs):
     # Logger.error("%s 开始运行...", process_name)
 
     while len(global_jar_dict) > 0:
@@ -742,10 +740,10 @@ def sub_find_loop_dependence_libs(libs, dependence_relation, loop_dependence_lib
         except Exception:
             pass
 
-def search_libs_in_app(lib_dex_folder = None,
-                      apk_folder = None,
-                      output_folder = 'outputs',
-                      processes = None):
+def search_libs_in_app(lib_dex_folder=None,
+                       apk_folder=None,
+                       output_folder='outputs',
+                       processes=None):
     # 获取分析完成的apk集合
     finish_apks = [apk[:apk.rfind(".")] for apk in os.listdir(output_folder)]
     print("分析完成的apk数量：", len(finish_apks))
@@ -891,16 +889,16 @@ def search_libs_in_app(lib_dex_folder = None,
         for i in range(1, detect_thread_num + 1):
             process_name = "子进程 " + str(i)
             thread = multiprocessing.Process(target=sub_detect_lib, args=(process_name,
-                                                                      global_jar_dict,
-                                                                      global_finished_jar_dict,
-                                                                      global_running_jar_list,
-                                                                      shared_lock_libs,
-                                                                      global_libs_info_dict,
-                                                                      shared_lock_libs_info,
-                                                                      apk_obj,
-                                                                      methodes_jar,
-                                                                      global_lib_info_dict,
-                                                                      loop_dependence_libs))
+                                                                          global_jar_dict,
+                                                                          global_finished_jar_dict,
+                                                                          global_running_jar_list,
+                                                                          shared_lock_libs,
+                                                                          global_libs_info_dict,
+                                                                          shared_lock_libs_info,
+                                                                          apk_obj,
+                                                                          methodes_jar,
+                                                                          global_lib_info_dict,
+                                                                          loop_dependence_libs))
             processes_list_detect.append(thread)
 
         # 开启所有子进程
@@ -971,11 +969,10 @@ def sub_detect_apk(process_name,
             global_result_dict[apk] = str(result[lib_obj.lib_name][2])
             share_lock_result.release()
 
-def search_lib_in_app(lib_dex_folder = None,
-                      apk_folder = None,
-                      output_folder = 'outputs',
-                      processes = None):
-
+def search_lib_in_app(lib_dex_folder=None,
+                      apk_folder=None,
+                      output_folder='outputs',
+                      processes=None):
     # 设置分析的cpu数量
     thread_num = processes if processes != None else max_thread_num
     LOGGER.info("分析使用的cpu数：%d", thread_num)
@@ -990,7 +987,6 @@ def search_lib_in_app(lib_dex_folder = None,
 
     time_end = datetime.datetime.now()
     LOGGER.debug("库信息提取完成, 用时：%d", (time_end - time_start).seconds)
-
 
     # 定义全局待分析的apk里列表
     global_apk_list = multiprocessing.Manager().list()
@@ -1025,13 +1021,13 @@ def search_lib_in_app(lib_dex_folder = None,
     all_apks_num = len(os.listdir(apk_folder))
     LOGGER.info("本次分析的apk数量为：%d", all_apks_num)
     time.sleep(1)
-    finish_num = all_apks_num-len(global_apk_list)
+    finish_num = all_apks_num - len(global_apk_list)
     while finish_num < all_apks_num:
         finish_rate = int(finish_num / all_apks_num * 100)
         print('\r' + "正在分析：" + '▇' * (int(finish_rate / 2)) + str(finish_rate) + '%', end='')
         time.sleep(1)
         time_sec += 1
-        finish_num = all_apks_num-len(global_apk_list)
+        finish_num = all_apks_num - len(global_apk_list)
     print('\r' + "正在分析：" + '▇' * (int(finish_num / all_apks_num * 100 / 2)) + str(
         int(finish_num / all_apks_num * 100)) + '%', end='')
     print("")
