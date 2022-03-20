@@ -1,0 +1,4 @@
+asn1crypto == 0.24.0
+decorator == 4.4.0
+lxml == 4.3.3
+networkx == 2.5.1
