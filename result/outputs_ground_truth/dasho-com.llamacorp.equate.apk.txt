@@ -1,7 +1,0 @@
-lib: support-v4-19.1.0
-similarity: 0.9990365128409582
-
-lib: com.viewpagerindicator.library.2.4.1 and com.inkapplications.viewpageindicator.library.2.4.3
-similarity: 0.962445065920895
-
-time: 16s

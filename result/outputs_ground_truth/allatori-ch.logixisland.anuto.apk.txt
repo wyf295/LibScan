@@ -1,4 +1,0 @@
-lib: simple-xml-2.7.1
-similarity: 0.9798127746290518
-
-time: 13s

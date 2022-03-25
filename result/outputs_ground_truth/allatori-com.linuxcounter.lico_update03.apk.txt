@@ -1,7 +1,0 @@
-lib: com.android.support.gridlayout-v7.18.0.0
-similarity: 0.9760479041916168
-
-lib: support-v4-18.0.0
-similarity: 0.9671598973274951
-
-time: 13s

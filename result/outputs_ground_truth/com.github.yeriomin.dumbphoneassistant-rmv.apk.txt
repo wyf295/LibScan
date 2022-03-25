@@ -1,4 +1,0 @@
-lib: junidecode-v0.2
-similarity: 0.9186602870813397
-
-time: 12s

@@ -1,7 +1,0 @@
-lib: gson-2.5
-similarity: 0.9979421751208972
-
-lib: javax.inject-1
-similarity: 1.0
-
-time: 13s

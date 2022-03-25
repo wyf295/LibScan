@@ -1,4 +1,0 @@
-lib: javax.inject-1
-similarity: 1.0
-
-time: 13s

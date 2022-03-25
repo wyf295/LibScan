@@ -1,7 +1,0 @@
-lib: stax-1.2.0
-similarity: 1.0
-
-lib: simple-xml-2.7.1
-similarity: 1.0
-
-time: 13s

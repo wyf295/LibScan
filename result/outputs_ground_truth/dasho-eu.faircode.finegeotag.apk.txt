@@ -1,4 +1,0 @@
-lib: gson-2.5
-similarity: 0.9958843502417944
-
-time: 11s

@@ -1,4 +1,0 @@
-lib: android-json-rpc-0.3.4
-similarity: 1.0
-
-time: 11s

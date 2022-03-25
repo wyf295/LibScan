@@ -1,4 +1,0 @@
-lib: org.cyanogenmod.platform.sdk
-similarity: 1.0
-
-time: 11s

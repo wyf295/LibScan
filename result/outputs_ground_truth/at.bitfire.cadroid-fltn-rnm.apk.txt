@@ -1,4 +1,0 @@
-lib: commons-lang3-3.3.2
-similarity: 0.9299329144925993
-
-time: 12s

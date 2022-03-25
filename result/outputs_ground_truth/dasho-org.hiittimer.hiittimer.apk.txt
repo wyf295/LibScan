@@ -1,7 +1,0 @@
-lib: support-v4-19.1.0
-similarity: 0.9994019734874913
-
-lib: greendao-1.3.7
-similarity: 1.0
-
-time: 13s

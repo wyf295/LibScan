@@ -1,4 +1,0 @@
-lib: com.larswerkman.HoloColorPicker.1.5
-similarity: 0.9975978037062457
-
-time: 11s
