@@ -1,0 +1,4 @@
+lib: fastjson-1.2.7
+similarity: 1.0
+
+time: 73s

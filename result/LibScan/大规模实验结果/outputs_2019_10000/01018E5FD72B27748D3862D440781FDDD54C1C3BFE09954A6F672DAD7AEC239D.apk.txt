@@ -1,0 +1,10 @@
+lib: commons-collections-3.2.1
+similarity: 0.9552927024859663
+
+lib: retrofit-2.2.0
+similarity: 0.951738006320023
+
+lib: retrofit-2.3.0
+similarity: 1.0
+
+time: 87s

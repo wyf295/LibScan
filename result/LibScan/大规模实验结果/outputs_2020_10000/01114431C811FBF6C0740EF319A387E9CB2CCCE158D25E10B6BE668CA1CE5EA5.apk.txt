@@ -1,0 +1,7 @@
+lib: retrofit-2.2.0
+similarity: 0.9284688307957484
+
+lib: retrofit-2.3.0
+similarity: 0.9723646723646724
+
+time: 48s

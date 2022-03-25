@@ -1,0 +1,20 @@
+1、检测多个apk中的多个库
+detect_all -o outputs -v INFO -af apks -lf libs -ld libs_dex
+detect_all -o outputs -v INFO -af apks_test -lf libs -ld libs_dex_test
+2、检测多个apk中的一个库
+detect_one -o outputs -v INFO -af apks -lf libs -ld libs_dex
+detect_one -o outputs -v INFO -af apks -lf libs -ld libs_dex_test
+detect_one -o outputs -v INFO -af apks -lf libs -ld libs_dex_test
+
+detect_all -o outputs -v INFO -af F:/download_apks/apks_2017_10000 -lf libs -ld libs_dex
+
+detect_all -o outputs -v INFO -af E:/googlePlay_top2000下载/top2000 -lf libs -ld libs_dex
+
+detect_all -o outputs -af  apks -lf libs -ld libs_dex
+
+检测com.example.root.analyticaltranslator.apk中是否包含internal_impl-22.0.0.dex：
+反编译、提取apk信息、构建过滤器用时：7507ms
+提取库信息，构建库类过滤器用时：747ms
+预匹配用时2ms
+粗粒度匹配用时5ms
+细粒度匹配用时23ms

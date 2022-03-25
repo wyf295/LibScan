@@ -1,0 +1,43 @@
+lib: jackson-databind-2.9.10
+similarity: 0.9743906358361948
+
+lib: jackson-databind-2.9.10.1
+similarity: 0.9743906358361948
+
+lib: jackson-databind-2.9.10.2
+similarity: 0.9743906358361948
+
+lib: jackson-databind-2.9.10.3
+similarity: 0.9743906358361948
+
+lib: jackson-databind-2.9.10.4
+similarity: 0.9743906358361948
+
+lib: jackson-databind-2.9.10.5
+similarity: 0.9743906358361948
+
+lib: jackson-databind-2.9.10.6
+similarity: 0.9743906358361948
+
+lib: jackson-databind-2.9.10.7
+similarity: 0.9743906358361948
+
+lib: jackson-databind-2.9.4
+similarity: 0.9172902918565888
+
+lib: jackson-databind-2.9.6
+similarity: 0.9702370857782451
+
+lib: jackson-databind-2.9.7
+similarity: 0.9916144333389801
+
+lib: jackson-databind-2.9.8
+similarity: 0.9804539295392954
+
+lib: jackson-databind-2.9.9
+similarity: 0.9774250321532526
+
+lib: jackson-databind-2.9.9.3
+similarity: 0.9759266464786588
+
+time: 62s

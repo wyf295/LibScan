@@ -1,0 +1,10 @@
+lib: log4j-1.2.17
+similarity: 1.0
+
+lib: retrofit-2.2.0
+similarity: 0.944843435794312
+
+lib: retrofit-2.3.0
+similarity: 0.9931623931623932
+
+time: 47s

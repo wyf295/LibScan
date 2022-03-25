@@ -1,0 +1,7 @@
+lib: log4j-1.2.17
+similarity: 0.8929645721925134
+
+lib: simple-xml-2.7.1
+similarity: 0.9045405336559893
+
+time: 39s

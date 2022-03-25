@@ -1,0 +1,10 @@
+lib: nifi-web-content-access-1.1.1
+similarity: 1.0
+
+lib: retrofit-2.4.0
+similarity: 1.0
+
+lib: simple-xml-2.7.1
+similarity: 1.0
+
+time: 161s

@@ -1,0 +1,10 @@
+lib: fastjson-1.2.24
+similarity: 1.0
+
+lib: retrofit-2.2.0
+similarity: 0.951738006320023
+
+lib: retrofit-2.3.0
+similarity: 1.0
+
+time: 59s

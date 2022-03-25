@@ -1,0 +1,7 @@
+lib: log4j-1.2.17
+similarity: 1.0
+
+lib: nifi-web-content-access-1.1.1
+similarity: 1.0
+
+time: 56s

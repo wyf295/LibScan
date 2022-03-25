@@ -1,0 +1,4 @@
+lib: log4j-1.2.17
+similarity: 0.99920621657754
+
+time: 38s

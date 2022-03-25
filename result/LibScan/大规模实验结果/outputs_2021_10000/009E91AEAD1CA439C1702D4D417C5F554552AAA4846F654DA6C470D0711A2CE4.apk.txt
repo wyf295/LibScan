@@ -1,0 +1,10 @@
+lib: commons-collections-3.2.1
+similarity: 0.9996658647420475
+
+lib: commons-io-2.4
+similarity: 1.0
+
+lib: log4j-1.2.17
+similarity: 1.0
+
+time: 107s

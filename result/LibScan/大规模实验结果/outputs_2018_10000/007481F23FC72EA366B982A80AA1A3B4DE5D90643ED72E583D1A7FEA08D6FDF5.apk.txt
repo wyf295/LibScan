@@ -1,0 +1,7 @@
+lib: fastjson-1.2.7
+similarity: 1.0
+
+lib: xstream-1.4.6
+similarity: 0.9406745633406947
+
+time: 32s

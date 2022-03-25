@@ -1,0 +1,4 @@
+lib: log4j-1.2.17-jar2dex
+similarity: 0.8929645721925134
+
+time: 63s

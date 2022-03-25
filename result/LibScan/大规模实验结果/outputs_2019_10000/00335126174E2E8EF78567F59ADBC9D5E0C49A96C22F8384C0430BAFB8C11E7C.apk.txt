@@ -1,0 +1,7 @@
+lib: retrofit-2.2.0
+similarity: 0.868141338695777
+
+lib: xstream-1.4.6
+similarity: 0.9032824733989159
+
+time: 94s

@@ -1,0 +1,7 @@
+lib: commons-io-2.4
+similarity: 1.0
+
+lib: log4j-1.2.17
+similarity: 0.9997075534759359
+
+time: 93s
