@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="2fcf0d3c-3f02-4134-a6ef-c13f3336ed79" name="Default Changelist" comment="final_version" />
+    <list default="true" id="2fcf0d3c-3f02-4134-a6ef-c13f3336ed79" name="Default Changelist" comment="final_version">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -29,7 +31,7 @@
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../../运行环境" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/.." />
   </component>
   <component name="RunManager" selected="Python.LibScan">
     <configuration name="LibScan" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
@@ -139,10 +141,10 @@
     </configuration>
     <list>
       <item itemvalue="Python.LibScan" />
+      <item itemvalue="Python.config" />
       <item itemvalue="Python.decompiler_apk" />
       <item itemvalue="Python.download_apks" />
       <item itemvalue="Python.run" />
-      <item itemvalue="Python.config" />
     </list>
     <recent_temporary>
       <list>
