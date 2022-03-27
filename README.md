@@ -6,7 +6,7 @@ LibScan是一种最新的Android应用程序第三方库检测工具，能够在
 # 安装
 ------------------------
 LibScan使用的python解释器版本为3.7.x，可以通过requirements.txt文件来安装依赖：
-注：使用的AndroGuard版本为3.4.0,使用的Dex2Jar版本为2.0，两者已被包含的tool文件夹下
+（使用的AndroGuard版本为3.4.0,使用的Dex2Jar版本为2.0，两者已被包含的tool文件夹下）
 ```
 pip install -r requirements.txt
 ```
@@ -27,7 +27,7 @@ optional arguments:
   -ld FOLDER    指定库dex文件夹
 ```
 举例：检测apks目录下的每个应用程序是否包含libs目录或者libs_dex目录下的每个库
-注意：可以直接提供库的jar文件或者转换后的dex文件
+（可以提供库的jar文件或者直接提供库转换好的dex文件）
 ```
 $ ./LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
 ```
@@ -56,14 +56,18 @@ LOGGER = logging.getLogger("console")
 
 # 例子
 ------------------------
-1、将data/ground_truth_apks文件夹下的com.linuxcounter.lico_update03.apk放入apks目录
-2、将data/ground_truth_libs文件夹下的所有库jar文件放入libs目录
-3、运行以下命令来检测com.linuxcounter.lico_update03.apk中是否包含data/ground_truth_libs下的库
+1、将data/ground_truth_apks文件夹下的com.linuxcounter.lico_update03.apk放入apks目录。
+
+2、将data/ground_truth_libs_dex文件夹下的所有库转换好的dex文件放入libs_dex文件夹下，或者
+将data/ground_truth_libs文件夹下的库jar文件放入libs文件夹下。
+
+3、运行以下命令来检测com.linuxcounter.lico_update03.apk中是否包含data/ground_truth_libs下
+的库。
 ```
 $ ./LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
 ```
 检测结果存在于outputs文件夹下的com.linuxcounter.lico_update03.apk.txt文件中，内容如下：
-其中包含检测出的库版本名称与对应的库相似度值，最后一行为该apk检测时间
+（结果文件包含检测出的库版本名称与对应的库相似度值，最后一行为该apk检测时间）
 ```
 lib: com.android.support.gridlayout-v7.18.0.0
 similarity: 1.0
