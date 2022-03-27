@@ -21,7 +21,7 @@ def parse_arguments():
         metavar='FOLDER',
         type=str,
         default='outputs',
-        help='指定结果输出目录')
+        help='指定结果输出文件夹')
     parser_one.add_argument(
         '-p',
         metavar='processes',
@@ -33,19 +33,19 @@ def parse_arguments():
         '-af',
         metavar='FOLDER',
         type=str,
-        help='指定一个apk目录'
+        help='指定一个apk文件夹'
     )
     parser_one.add_argument(
         '-lf',
         metavar='FOLDER',
         type=str,
-        help='指定一个lib目录'
+        help='指定一个lib文件夹'
     )
     parser_one.add_argument(
         '-ld',
         metavar='FOLDER',
         type=str,
-        help='指定库生成的dex文件目录'
+        help='指定库dex文件夹'
     )
 
     parser_specific = subparsers.add_parser(
@@ -55,7 +55,7 @@ def parse_arguments():
         metavar='FOLDER',
         type=str,
         default='outputs',
-        help='指定结果输出目录')
+        help='指定结果输出文件夹')
     parser_specific.add_argument(
         '-p',
         metavar='processes',
@@ -67,18 +67,18 @@ def parse_arguments():
         '-af',
         metavar='FOLDER',
         type=str,
-        help='指定一个apk目录')
+        help='指定一个apk文件夹')
     parser_specific.add_argument(
         '-lf',
         metavar='FOLDER',
         type=str,
-        help='指定一个lib目录'
+        help='指定一个lib文件夹'
     )
     parser_specific.add_argument(
         '-ld',
         metavar='FOLDER',
         type=str,
-        help='指定库生成的dex文件目录'
+        help='指定库dex文件夹'
     )
 
     return parser.parse_args()
