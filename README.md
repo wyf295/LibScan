@@ -56,12 +56,12 @@ LOGGER = logging.getLogger("console")
 
 # 例子
 ------------------------
-1、将data/ground_truth_apks文件夹下的com.linuxcounter.lico_update03.apk放入apks目录。
+第一步：将data/ground_truth_apks文件夹下的com.linuxcounter.lico_update03.apk放入apks目录。
 
-2、将data/ground_truth_libs_dex文件夹下的所有库转换好的dex文件放入libs_dex文件夹下，或者
+第二步：将data/ground_truth_libs_dex文件夹下的所有库转换好的dex文件放入libs_dex文件夹下，或者
 将data/ground_truth_libs文件夹下的库jar文件放入libs文件夹下。
 
-3、运行以下命令来检测com.linuxcounter.lico_update03.apk中是否包含data/ground_truth_libs下
+第三步：运行以下命令来检测com.linuxcounter.lico_update03.apk中是否包含data/ground_truth_libs下
 的库。
 ```
 $ ./LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
