@@ -33,6 +33,7 @@ $ ./LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
 
 # 核心参数
 ------------------------
+可在工具的module/config.py文件中进行以下配置的调整
 ```
 # 设置全局最大并行线程数
 max_thread_num = multiprocessing.cpu_count()
@@ -56,6 +57,8 @@ LOGGER = logging.getLogger("console")
 
 # 例子
 ------------------------
+检测data/ground_truth_apks中的com.linuxcounter.lico_update03.apk针对data/ground_truth_libs_dex文件夹下的所有库的包含情况。
+
 第一步：将data/ground_truth_apks文件夹下的com.linuxcounter.lico_update03.apk放入apks目录。
 
 第二步：将data/ground_truth_libs_dex文件夹下的所有库转换好的dex文件放入libs_dex文件夹下，或者
