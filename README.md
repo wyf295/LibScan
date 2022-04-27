@@ -6,7 +6,6 @@ LibScan是一种最新的Android应用程序第三方库检测工具，能够在
 # 安装
 ------------------------
 LibScan使用的python解释器版本为3.7.x，可以通过requirements.txt文件来安装依赖：
-（使用的AndroGuard版本为3.4.0,使用的Dex2Jar版本为2.0，两者已被包含的tool文件夹下）
 ```
 pip install -r requirements.txt
 ```
@@ -36,7 +35,7 @@ $ ./LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
 ------------------------
 ```
 # 设置全局最大并行线程数
-max_thread_num = multiprocessing.cpu_count() - 1
+max_thread_num = multiprocessing.cpu_count()
 
 # 设置库级别检测"lib"或库版本级别检测"lib_version"（默认库版本级别，需要提供库与真实包名映射文件obf_tpl_pkg.csv）
 detect_type = "lib_version"
