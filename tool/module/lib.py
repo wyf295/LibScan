@@ -336,7 +336,7 @@ class ThirdLib(object):
         lib = self.lib_name
         lib_name_version = lib[:lib.rfind("-")]
 
-        csv_reader = csv.reader(open("conf/obf_tpl_pkg.csv", encoding="utf-8"))
+        csv_reader = csv.reader(open("conf/lib_name_map.csv", encoding="utf-8"))
         csv_reader = list(csv_reader)
 
         lib_name_dict = {}

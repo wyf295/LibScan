@@ -27,7 +27,7 @@ def get_methods_jar_map():
 
     return methodes_jar
 
-# 根据obf_tpl_pkg.csv文件，根据库的显示名称确定库的真实包名(如果映射文件中未定义，则直接返回库原始版本名作为库的真实名称，如：batik-dom-1.9.1）
+# 根据lib_name_map.csv文件，根据库的显示名称确定库的真实包名(如果映射文件中未定义，则直接返回库原始版本名作为库的真实名称，如：batik-dom-1.9.1）
 def get_lib_name(lib):
     lib_name_version = lib[:lib.rfind(".")]
 
@@ -35,7 +35,7 @@ def get_lib_name(lib):
         return lib_name_version
 
     import csv
-    csv_reader = csv.reader(open("conf/obf_tpl_pkg.csv", encoding="utf-8"))
+    csv_reader = csv.reader(open("conf/lib_name_map.csv", encoding="utf-8"))
     csv_reader = list(csv_reader)
 
     lib_name_dict = {}
@@ -43,7 +43,7 @@ def get_lib_name(lib):
         lib_name_dict[line[0]] = line[1]
 
     if lib_name_version not in lib_name_dict:
-        LOGGER.debug("没有在obf_tpl_pkg.csv文件中找到库对应的真实名称信息：%s", lib_name_version)
+        LOGGER.debug("没有在lib_name_map.csv文件中找到库对应的真实名称信息：%s", lib_name_version)
         return lib_name_version
 
     return lib_name_dict[lib_name_version].replace("/", ".")
@@ -773,28 +773,30 @@ def search_libs_in_app(lib_dex_folder=None,
     shared_lock_loop_libs = multiprocessing.Manager().Lock()
 
     decompile_thread_num = thread_num if thread_num <= len(libs) else len(libs)
-    # 构建方法与所属库映射文件，用于后续找出依赖库
-    if not os.path.exists("conf/methodes_jar.txt"):
-        processes_list_method_maps = []
+    # 构建当前方法与所属库映射文件，用于后续分析依赖库
+    if os.path.exists("conf/methodes_jar.txt"):
+        os.remove("conf/methodes_jar.txt")
 
-        for sub_libs in split_list_n_list(libs, decompile_thread_num):
-            thread = multiprocessing.Process(target=sub_method_map_decompile,
-                                             args=(lib_dex_folder,
-                                                   sub_libs,
-                                                   global_lib_info_dict,
-                                                   shared_lock_lib_info))
+    processes_list_method_maps = []
 
-            processes_list_method_maps.append(thread)
+    for sub_libs in split_list_n_list(libs, decompile_thread_num):
+        thread = multiprocessing.Process(target=sub_method_map_decompile,
+                                         args=(lib_dex_folder,
+                                               sub_libs,
+                                               global_lib_info_dict,
+                                               shared_lock_lib_info))
 
-        # 开启所有反编译子进程
-        for thread in processes_list_method_maps:
-            thread.start()
+        processes_list_method_maps.append(thread)
 
-        # 等待所有反编译子进程运行结束
-        for thread in processes_list_method_maps:
-            thread.join()
+    # 开启所有反编译子进程
+    for thread in processes_list_method_maps:
+        thread.start()
 
-        print("方法所属库映射文件构建完成...")
+    # 等待所有反编译子进程运行结束
+    for thread in processes_list_method_maps:
+        thread.join()
+
+    print("方法所属库映射文件构建完成...")
 
     # 定义多进程将所有待检测的库全部反编译，并提取库反编译得到的各类信息
     methodes_jar = get_methods_jar_map()

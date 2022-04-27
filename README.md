@@ -37,7 +37,8 @@ $ ./LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
 # 设置全局最大并行线程数
 max_thread_num = multiprocessing.cpu_count()
 
-# 设置库级别检测"lib"或库版本级别检测"lib_version"（默认库版本级别，需要提供库与真实包名映射文件obf_tpl_pkg.csv）
+# 设置库级别检测"lib"或库版本级别检测"lib_version"
+# 默认库版本级别，需要在lib_name_map.csv文件中提供库与真实包名映射信息，用于确定库文件属于同一个库的不同版本
 detect_type = "lib_version"
 
 # 类相似度阈值
