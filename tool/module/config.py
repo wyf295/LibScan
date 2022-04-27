@@ -4,7 +4,7 @@ import multiprocessing
 
 # Operating parameters related config
 # 设置全局最大并行线程数
-max_thread_num = multiprocessing.cpu_count() - 1
+max_thread_num = multiprocessing.cpu_count()
 
 # 设置库级别检测"lib"或库版本级别检测"lib_version"（默认库版本级别，需要提供库与真实包名映射文件obf_tpl_pkg.csv）
 detect_type = "lib_version"
