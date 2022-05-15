@@ -1,1 +1,0 @@
-{"filename": "Vine_v7.0.0_apkpure.com.apk", "appID": "co.vine.android", "permissions": [], "libraries": [{"name": "nifi-security-1.1.1", "version": [""], "category": "libs", "root_package_exist": false, "similarity": 0.4, "matched_root_package": ["Landroid/support/v4/content"], "shrink_percentage": 1}], "time": 6.80400013923645}
