@@ -1,4 +1,0 @@
-lib: nifi-web-content-access-1.1.1
-similarity: 1.0
-
-time: 36s
