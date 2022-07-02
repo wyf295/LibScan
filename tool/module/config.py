@@ -4,7 +4,7 @@ import multiprocessing
 
 # Operating parameters related config
 # 设置全局最大并行线程数
-max_thread_num = multiprocessing.cpu_count() - 1
+max_thread_num = multiprocessing.cpu_count()
 
 # 设置库级别检测"lib"或库版本级别检测"lib_version"
 # 默认库版本级别，需要在lib_name_map.csv文件中提供库与真实包名映射信息，用于确定库文件属于同一个库的不同版本
