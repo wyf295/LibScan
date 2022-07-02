@@ -87,7 +87,10 @@ def parse_arguments():
 def jar_to_dex(libs_folder, lib_dex_folder):
     for file in os.listdir(libs_folder):
         file_name = file[:file.rfind(".")]
-        cmd = "d2j-jar2dex.bat " + libs_folder + "/" + file + " -o " + lib_dex_folder + "/" + file_name + ".dex"
+        if sys.platform.find("win") != -1:
+            cmd = "d2j-jar2dex.bat " + libs_folder + "/" + file + " -o " + lib_dex_folder + "/" + file_name + ".dex"
+        else:
+            cmd = "d2j-jar2dex.sh " + libs_folder + "/" + file + " -o " + lib_dex_folder + "/" + file_name + ".dex"
         os.system(cmd)
 
 # 将aar文件转换为jar文件
