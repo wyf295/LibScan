@@ -434,7 +434,6 @@ def get_methods_action(method_list, node_dict):
     method_action_dict = {}
 
     for method in method_list:
-        # print("分析方法：",method)
         get_method_action(method + "_1", node_dict, method_action_dict, set(), 0)
 
     return method_action_dict
@@ -612,7 +611,6 @@ def detect(apk_obj, lib_obj):
         min_lib_match = 1.0
 
     # print("当前库为：", lib_obj.lib_name)
-    # print("min_lib_match: ", min_lib_match)
     temp_list = [final_match_opcodes, lib_opcode_num, final_match_opcodes / lib_opcode_num]
     if final_match_opcodes / lib_opcode_num >= min_lib_match:
         LOGGER.debug("包含")
@@ -645,7 +643,6 @@ def detect_lib(libs_name,
                                global_lib_info_dict, loop_dependence_libs)
         if lib_obj == None:
             LOGGER.debug("存在尚未分析完成的依赖库！")
-            # print("存在依赖！")
             flag = False
             return result, flag
         lib_versions_dict[lib] = lib_obj
@@ -796,8 +793,6 @@ def search_libs_in_app(lib_dex_folder=None,
     for thread in processes_list_method_maps:
         thread.join()
 
-    # print("方法所属库映射文件构建完成...")
-
     # 定义多进程将所有待检测的库全部反编译，并提取库反编译得到的各类信息
     methodes_jar = get_methods_jar_map()
     processes_list_decompile = []
@@ -823,7 +818,7 @@ def search_libs_in_app(lib_dex_folder=None,
     for thread in processes_list_decompile:
         thread.join()
 
-    # print("所有库信息提取完成...")
+    print("所有库信息提取完成...")
 
     # 定义多线程根据库依赖关系找出所有存在循环依赖的库，后续对于这些库的检测不考虑依赖库
     if len(global_dependence_libs) != 0:
@@ -847,8 +842,6 @@ def search_libs_in_app(lib_dex_folder=None,
         # 等待所有反编译子进程运行结束
         for thread in processes_list_libs_dependence:
             thread.join()
-
-    # print("循环依赖库如下：", loop_dependence_libs)
 
     time_end = datetime.datetime.now()
     LOGGER.debug("所有库信息提取完成, 用时：%d", (time_end - time_start).seconds)
