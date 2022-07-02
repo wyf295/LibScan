@@ -796,7 +796,7 @@ def search_libs_in_app(lib_dex_folder=None,
     for thread in processes_list_method_maps:
         thread.join()
 
-    print("方法所属库映射文件构建完成...")
+    # print("方法所属库映射文件构建完成...")
 
     # 定义多进程将所有待检测的库全部反编译，并提取库反编译得到的各类信息
     methodes_jar = get_methods_jar_map()
@@ -823,7 +823,7 @@ def search_libs_in_app(lib_dex_folder=None,
     for thread in processes_list_decompile:
         thread.join()
 
-    print("所有库信息提取完成...")
+    # print("所有库信息提取完成...")
 
     # 定义多线程根据库依赖关系找出所有存在循环依赖的库，后续对于这些库的检测不考虑依赖库
     if len(global_dependence_libs) != 0:
@@ -848,7 +848,7 @@ def search_libs_in_app(lib_dex_folder=None,
         for thread in processes_list_libs_dependence:
             thread.join()
 
-    print("循环依赖库如下：", loop_dependence_libs)
+    # print("循环依赖库如下：", loop_dependence_libs)
 
     time_end = datetime.datetime.now()
     LOGGER.debug("所有库信息提取完成, 用时：%d", (time_end - time_start).seconds)
