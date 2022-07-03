@@ -1,13 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="2fcf0d3c-3f02-4134-a6ef-c13f3336ed79" name="Default Changelist" comment="final_version">
-      <change beforePath="$PROJECT_DIR$/../.idea/LibScan.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../.idea/LibScan.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../README.md" beforeDir="false" afterPath="$PROJECT_DIR$/../README.md" afterDir="false" />
+    <list default="true" id="2fcf0d3c-3f02-4134-a6ef-c13f3336ed79" name="Default Changelist" comment="删除部分无关的打印信息">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/module/analyzer.py" beforeDir="false" afterPath="$PROJECT_DIR$/module/analyzer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/outputs/allatori-ar.com.tristeslostrestigres.diasporanativewebapp.apk.txt" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -36,7 +31,7 @@
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/.." />
   </component>
   <component name="RunManager" selected="Python.LibScan">
     <configuration name="LibScan" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
@@ -219,7 +214,42 @@
       <option name="project" value="LOCAL" />
       <updated>1647760022790</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="添加dex2jai针对linux系统运行支持">
+      <created>1656754239522</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1656754239522</updated>
+    </task>
+    <task id="LOCAL-00009" summary="添加dex2jar对linux系统运行支持">
+      <created>1656754399610</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1656754399610</updated>
+    </task>
+    <task id="LOCAL-00010" summary="修改运行的最大cpu线程数">
+      <created>1656756776956</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1656756776957</updated>
+    </task>
+    <task id="LOCAL-00011" summary="删除部分无关的打印信息">
+      <created>1656757426788</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1656757426788</updated>
+    </task>
+    <task id="LOCAL-00012" summary="删除部分无关的打印信息">
+      <created>1656758030918</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1656758030918</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -239,6 +269,10 @@
     <MESSAGE value="修复bug" />
     <MESSAGE value="version1.0" />
     <MESSAGE value="final_version" />
-    <option name="LAST_COMMIT_MESSAGE" value="final_version" />
+    <MESSAGE value="添加dex2jai针对linux系统运行支持" />
+    <MESSAGE value="添加dex2jar对linux系统运行支持" />
+    <MESSAGE value="修改运行的最大cpu线程数" />
+    <MESSAGE value="删除部分无关的打印信息" />
+    <option name="LAST_COMMIT_MESSAGE" value="删除部分无关的打印信息" />
   </component>
 </project>
