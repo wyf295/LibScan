@@ -15,70 +15,70 @@ def parse_arguments():
         help='sub-command help', dest='subparser_name')
 
     parser_one = subparsers.add_parser(
-        'detect_one', help='单检测模式：检测多个apk中是否存在某一个第三方库具体版本（apk检测级并行）')
+        'detect_one', help='Detection mode (Single): detect if multiple apps contain a specific TPL version')
     parser_one.add_argument(
         '-o',
         metavar='FOLDER',
         type=str,
         default='outputs',
-        help='指定结果输出文件夹')
+        help='Specify directory of detection results (containing result in .TXT per app)')
     parser_one.add_argument(
         '-p',
-        metavar='processes',
+        metavar='num_processes',
         type=int,
         default=None,
-        help='设置所有并行工作阶段的最大线程数（默认为当前工作机器的CPU核心数）'
+        help='Specify maximum number of processes used in detection (default=#CPU_cores)'
     )
     parser_one.add_argument(
         '-af',
         metavar='FOLDER',
         type=str,
-        help='指定一个apk文件夹'
+        help='Specify directory of apps'
     )
     parser_one.add_argument(
         '-lf',
         metavar='FOLDER',
         type=str,
-        help='指定一个lib文件夹'
+        help='Specify directory of TPL versions'
     )
     parser_one.add_argument(
         '-ld',
         metavar='FOLDER',
         type=str,
-        help='指定库dex文件夹'
+        help='Specify directory of TPL versions in DEX files'
     )
 
     parser_specific = subparsers.add_parser(
-        'detect_all', help='多检测模式：检测多个apk中是否存在多个第三方库具体版本（库检测级并行）')
+        'detect_all', help='Detection mode (Multiple): detect if multiple apps contain multiple TPL versions')
     parser_specific.add_argument(
         '-o',
         metavar='FOLDER',
         type=str,
         default='outputs',
-        help='指定结果输出文件夹')
+        help='Specify directory of detection results (containing result in .TXT per app)')
     parser_specific.add_argument(
         '-p',
-        metavar='processes',
+        metavar='num_processes',
         type=int,
         default=None,
-        help='设置所有并行工作阶段的最大线程数（默认为当前工作机器的CPU核心数）'
+        help='Specify maximum number of processes used in detection (default=#CPU_cores)'
     )
     parser_specific.add_argument(
         '-af',
         metavar='FOLDER',
         type=str,
-        help='指定一个apk文件夹')
+        help='Specify directory of apps')
     parser_specific.add_argument(
         '-lf',
         metavar='FOLDER',
         type=str,
-        help='指定一个lib文件夹'
+        help='Specify directory of TPL versions'
     )
     parser_specific.add_argument(
         '-ld',
         metavar='FOLDER',
         type=str,
-        help='指定库dex文件夹'
+        help='Specify directory of TPL versions in DEX files'
     )
 
     return parser.parse_args()

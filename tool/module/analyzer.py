@@ -743,7 +743,7 @@ def search_libs_in_app(lib_dex_folder=None,
                        processes=None):
     # 获取分析完成的apk集合
     finish_apks = [apk[:apk.rfind(".")] for apk in os.listdir(output_folder)]
-    print("分析完成的apk数量：", len(finish_apks))
+    print("num of apk analyzed: ", len(finish_apks))
 
     # 设置分析的cpu数量上限
     thread_num = processes if processes != None else max_thread_num
@@ -818,7 +818,7 @@ def search_libs_in_app(lib_dex_folder=None,
     for thread in processes_list_decompile:
         thread.join()
 
-    print("所有库信息提取完成...")
+    print("All TPL information extracted ...")
 
     # 定义多线程根据库依赖关系找出所有存在循环依赖的库，后续对于这些库的检测不考虑依赖库
     if len(global_dependence_libs) != 0:
@@ -851,7 +851,7 @@ def search_libs_in_app(lib_dex_folder=None,
         if apk in finish_apks:
             continue
 
-        print("开始分析：", apk)
+        print("start analyzing: ", apk)
         LOGGER.info("开始分析：%s", apk)
         apk_time_start = datetime.datetime.now()
 
@@ -908,11 +908,11 @@ def search_libs_in_app(lib_dex_folder=None,
         finish_num = all_libs_num - len(global_jar_dict) - len(global_running_jar_list)
         while finish_num < all_libs_num:
             finish_rate = int(finish_num / all_libs_num * 100)
-            print('\r' + "正在分析：" + '▇' * (int(finish_rate / 2)) + str(finish_rate) + '%', end='')
+            print('\r' + "current analysis: " + '▇' * (int(finish_rate / 2)) + str(finish_rate) + '%', end='')
             time.sleep(1)
             time_sec += 1
             finish_num = all_libs_num - len(global_jar_dict) - len(global_running_jar_list)
-        print('\r' + "正在分析：" + '▇' * (int(finish_num / all_libs_num * 100 / 2)) + str(
+        print('\r' + "current analysis: " + '▇' * (int(finish_num / all_libs_num * 100 / 2)) + str(
             int(finish_num / all_libs_num * 100)) + '%', end='')
         print("")
 
@@ -994,7 +994,7 @@ def search_lib_in_app(lib_dex_folder=None,
     share_lock_result = multiprocessing.Manager().Lock()
 
     # 定义apk级多线程检测
-    print("开始检测...")
+    print("Start detection ...")
     processes_list_detect = []
     for i in range(1, thread_num + 1):
         process_name = str(i)
@@ -1019,11 +1019,11 @@ def search_lib_in_app(lib_dex_folder=None,
     finish_num = all_apks_num - len(global_apk_list)
     while finish_num < all_apks_num:
         finish_rate = int(finish_num / all_apks_num * 100)
-        print('\r' + "正在分析：" + '▇' * (int(finish_rate / 2)) + str(finish_rate) + '%', end='')
+        print('\r' + "current analysis: " + '▇' * (int(finish_rate / 2)) + str(finish_rate) + '%', end='')
         time.sleep(1)
         time_sec += 1
         finish_num = all_apks_num - len(global_apk_list)
-    print('\r' + "正在分析：" + '▇' * (int(finish_num / all_apks_num * 100 / 2)) + str(
+    print('\r' + "current analysis: " + '▇' * (int(finish_num / all_apks_num * 100 / 2)) + str(
         int(finish_num / all_apks_num * 100)) + '%', end='')
     print("")
 

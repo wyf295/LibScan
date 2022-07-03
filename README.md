@@ -1,75 +1,81 @@
 # LibScan
-------------------------
-LibScan是一种最新的Android应用程序第三方库检测工具，能够在给定Android应用程序（apk文件）与第三方库（jar文件）的情况下检测应用程序中使用的库版本信息。
 
-# 安装
+- LibScan is a third-party library (TPL) detection tool for Android apps. Given the list of TPL JARs/DEXs and the Android app(s), it can detect which TPLs (and their versions) are used in the app(s).
 ------------------------
-LibScan使用的python解释器版本为3.7.x，可以通过requirements.txt文件来安装依赖：
-```
-pip install -r requirements.txt
-```
 
-# 使用手册
-------------------------
-通过运行程序时添加参数detect_all -h，得到参数帮助文档如下：
+# Install Dependencies
+
 ```
-usage: LibScan.py detect_all [-h] [-o FOLDER] [-p processes] [-af FOLDER]
-                             [-lf FOLDER] [-ld FOLDER]
+sudo apt install python3-pip
+pip install asn1crypto decorator lxml networkx
+```
+------------------------
+
+# Usage
+
+```
+cd tool
+python3 LibScan.py detec_all [options]
+```
+- Please refer to the following command-line options in detail:
+```
+usage: LibScan.py detect_all [-h] [-o FOLDER] [-p num_processes] [-af FOLDER] [-lf FOLDER] [-ld FOLDER]
 
 optional arguments:
-  -h, --help    show this help message and exit
-  -o FOLDER     指定结果输出文件夹
-  -p processes  设置所有并行工作阶段的最大线程数（默认为当前工作机器的CPU核心数）
-  -af FOLDER    指定一个apk文件夹
-  -lf FOLDER    指定一个lib文件夹
-  -ld FOLDER    指定库dex文件夹
+  -h, --help        show this help message and exit
+  -o FOLDER         Specify directory of detection results (containing result in .TXT per app)
+  -p num_processes  Specify maximum number of processes used in detection (default=#CPU_cores)
+  -af FOLDER        Specify directory of apps
+  -lf FOLDER        Specify directory of TPL versions
+  -ld FOLDER        Specify directory of TPL versions in DEX files
 ```
-举例：检测apks目录下的每个应用程序是否包含libs目录或者libs_dex目录下的每个库
-（可以提供库的jar文件或者直接提供库转换好的dex文件）
+- Usage example: For the apks in directory `tool/apks`, detect if each apk contains the TPL versions in `tool/libs` or `tool/libs_dex`.
+- User may put the JAR file of TPL into `tool/libs`, or put the DEX file of TPL into `tool/libs_dex`.
 ```
-$ ./LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
+python3 LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
 ```
-
-# 核心参数
 ------------------------
-可在工具的module/config.py文件中进行以下配置的调整
+
+# Configurations
+
+The major configurations can be deployed in `module/config.py`
 ```
-# 设置全局最大并行线程数
+# Maximum number of processes used in detection:
 max_thread_num = multiprocessing.cpu_count()
 
-# 设置库级别检测"lib"或库版本级别检测"lib_version"
-# 默认库版本级别，需要在lib_name_map.csv文件中提供库与真实包名映射信息，用于确定库文件属于同一个库的不同版本
+# Detection level: ("lib"=TPL level detection; "lib_version"=TPL version level detection)
+# Default is TPL version level detection. Need to provide (TPL version,TPL) mapping in `conf/lib_name_map.csv` (We have provide the mapping for the ground truth dataset)
 detect_type = "lib_version"
 
-# 类相似度阈值
+# class similarity threshold (theta)
 class_similar = 0.7
-# 库相似度阈值
+# lib similarity threahold (theta2)
 lib_similar = 0.85
 
-# 全局日志配置（默认INFO模式，改为DEBUG模式可输出各个匹配阶段的匹配结果到log文件
+# Global log configuration (INFO mode by default. Will output the phase-level matching results into log file when using DEBUG mode
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - [%(lineno)d] - %(message)s',
                     filename="log.txt",
                     filemode="a+")
 LOGGER = logging.getLogger("console")
 ```
-
-# 例子
 ------------------------
-检测data/ground_truth_apks中的com.linuxcounter.lico_update03.apk针对data/ground_truth_libs_dex文件夹下的所有库的包含情况。
 
-第一步：将data/ground_truth_apks文件夹下的com.linuxcounter.lico_update03.apk放入apks目录。
+# Example
 
-第二步：将data/ground_truth_libs_dex文件夹下的所有库转换好的dex文件放入libs_dex文件夹下，或者
-将data/ground_truth_libs文件夹下的库jar文件放入libs文件夹下。
+We detect `data/ground_truth_apks/com.linuxcounter.lico_update03.apk` contains which TPL versions in `data/ground_truth_libs`.
 
-第三步：运行以下命令来检测com.linuxcounter.lico_update03.apk中是否包含data/ground_truth_libs下
-的库。
+Step 1: put `data/ground_truth_apks/com.linuxcounter.lico_update03.apk` into `tool/apks`.
+
+Step 2: put all the library DEX files in `data/ground_truth_libs_dex` into `tool/libs_dex`, or
+	pub all the library JAR files in `data/ground_truth_libs` into `tool/libs`.
+
+Step 3: run the following command:
 ```
-$ ./LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
+python3 LibScan.py detect_all -o outputs -af apks -lf libs -ld libs_dex
 ```
-检测结果存在于outputs文件夹下的com.linuxcounter.lico_update03.apk.txt文件中，内容如下：
-（结果文件包含检测出的库版本名称与对应的库相似度值，最后一行为该apk检测时间）
+
+The detection result is at `tool/outputs/com.linuxcounter.lico_update03.apk.txt`. The content is in the form `(TPL version name, similarity value)` and the detection time cost in the last line.
 ```
 lib: com.android.support.gridlayout-v7.18.0.0
 similarity: 1.0
@@ -82,3 +88,4 @@ similarity: 1.0
 
 time: 13s
 ```
+
